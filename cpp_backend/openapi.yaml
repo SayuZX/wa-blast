@@ -1,0 +1,177 @@
+openapi: 3.0.0
+info:
+  title: wa_api_server (QA Multi-Profile Harness)
+  version: 1.0.0
+  description: >-
+    Monolithic C++ backend for isolated multi-profile messaging QA.
+    Single static binary (no Python/Node/JVM). Local SQLite storage.
+    For internal testing only.
+servers:
+  - url: http://localhost:8080
+    description: Local device (Termux/ADB)
+  - url: http://<device-ip>:8080
+    description: Device on LAN
+
+security:
+  - ApiKeyAuth: []
+  - BearerAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerAuth:
+      type: http
+      scheme: bearer
+  schemas:
+    Profile:
+      type: object
+      properties:
+        name: { type: string, example: WA_1 }
+        android_user: { type: integer, example: 0 }
+        status: { type: string, enum: [active, inactive] }
+        spoof: { type: object }
+        created_at: { type: string, format: date-time }
+    Log:
+      type: object
+      properties:
+        log_id: { type: string, format: uuid }
+        timestamp: { type: string, format: date-time }
+        profile: { type: string }
+        target: { type: string }
+        message_preview: { type: string }
+        status: { type: string, enum: [SUCCESS, FAILED, RETRY] }
+        attempt: { type: integer }
+        error_code: { type: integer }
+        error_message: { type: string }
+        duration_ms: { type: integer }
+    BlastJob:
+      type: object
+      properties:
+        job_id: { type: string, format: uuid }
+        status: { type: string, enum: [running, finished] }
+        total: { type: integer }
+        done: { type: integer }
+        succeeded: { type: integer }
+        failed: { type: integer }
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/Log' }
+
+paths:
+  /api/health:
+    get:
+      summary: Health check (no auth)
+      responses:
+        '200':
+          description: OK
+  /api/auth:
+    post:
+      summary: Verify API key
+      security: []
+      responses:
+        '200': { description: authenticated }
+        '401': { description: invalid key }
+  /api/profiles:
+    get:
+      summary: List profiles
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profiles:
+                    type: array
+                    items: { $ref: '#/components/schemas/Profile' }
+  /api/profiles/switch:
+    post:
+      summary: Switch active profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [profile]
+              properties:
+                profile: { type: string, example: WA_2 }
+      responses:
+        '200': { description: switched }
+  /api/profiles/{id}/status:
+    get:
+      summary: Get profile status
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+        '404': { description: not found }
+  /api/message/send:
+    post:
+      summary: Send a single message (with retry)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [number, message]
+              properties:
+                number: { type: string }
+                message: { type: string }
+                profile: { type: string, default: WA_1 }
+      responses:
+        '200': { description: sent }
+  /api/message/blast:
+    post:
+      summary: Blast a message to many numbers (queue + retry + per-target status)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [targets, message]
+              properties:
+                targets:
+                  type: array
+                  items: { type: string }
+                message: { type: string }
+                profile: { type: string, default: WA_1 }
+      responses:
+        '200': { description: job started }
+        '409': { description: another blast running }
+  /api/blast/{job_id}/status:
+    get:
+      summary: Blast job status
+      parameters:
+        - { name: job_id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+        '404': { description: not found }
+  /api/logs:
+    get:
+      summary: List logs (filtered)
+      parameters:
+        - { name: profile, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string } }
+        - { name: date, in: query, schema: { type: string, format: date } }
+        - { name: limit, in: query, schema: { type: integer, default: 100 } }
+      responses:
+        '200': { description: OK }
+    delete:
+      summary: Prune old logs (retention days from config)
+      responses:
+        '200': { description: deleted }
+  /api/logs/{id}:
+    get:
+      summary: Get a single log
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: OK }
+        '404': { description: not found }
