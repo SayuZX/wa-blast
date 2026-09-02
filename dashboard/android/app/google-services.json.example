@@ -1,0 +1,30 @@
+{
+  "_comment": "TEMPLATE. Salin ke dashboard/android/app/google-services.json dan isi nilai asli dari Firebase Console (Project Settings > Your apps). File asli DI-IGNORE oleh git (.gitignore) agar kredensial tidak bocor.",
+  "project_info": {
+    "project_number": "PASTE_PROJECT_NUMBER",
+    "project_id": "PASTE_PROJECT_ID",
+    "storage_bucket": "PASTE_PROJECT_ID.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "PASTE_MOBILESDK_APP_ID",
+        "android_client_info": {
+          "package_name": "com.example.qa_harness_dashboard"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "PASTE_API_KEY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
