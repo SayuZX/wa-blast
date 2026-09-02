@@ -1,6 +1,10 @@
 package wa_pro.blast
 
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
+import android.view.accessibility.AccessibilityManager
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -29,6 +33,11 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "checkRoot" -> result.success(checkRoot())
+                    "sendViaAccessibility" -> {
+                        val number = call.argument<String>("number") ?: ""
+                        val message = call.argument<String>("message") ?: ""
+                        result.success(sendViaAccessibility(number, message))
+                    }
                     "execAsRoot" -> {
                         val cmd = call.argument<String>("cmd") ?: ""
                         execShell(cmd) { code, out, err ->
@@ -84,5 +93,41 @@ class MainActivity : FlutterActivity() {
                 cb(-1, "", e.message ?: "exec failed")
             }
         }.start()
+    }
+
+    private fun isAccessibilityEnabled(): Boolean {
+        val am = getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
+        val services = am.getEnabledAccessibilityServiceList(
+            android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK
+        )
+        for (s in services) {
+            if (s.resolveInfo.serviceInfo.packageName == packageName) return true
+        }
+        return false
+    }
+
+    /**
+     * Send via the accessibility service (non-root automation).
+     * If the service is not enabled, opens the accessibility settings screen.
+     * Returns a status string.
+     */
+    private fun sendViaAccessibility(number: String, message: String): String {
+        if (!isAccessibilityEnabled()) {
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+            return "accessibility_not_enabled"
+        }
+        WaAutomationService.pendingNumber = number
+        WaAutomationService.pendingMessage = message
+        // Open WhatsApp (trigger onAccessibilityEvent).
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://wa.me/$number"))
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(intent)
+        } catch (e: Exception) {
+            return "whatsapp_not_installed"
+        }
+        return "queued"
     }
 }
