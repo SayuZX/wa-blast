@@ -9,9 +9,11 @@
   "wa_package": "com.whatsapp",
   "target_activity": "com.whatsapp.Main",
   "on_device": true,
+  "simulate": false,
   "storage": {
     "db_path": "./wa_harness.db",
-    "log_retention_days": 7
+    "log_retention_days": 7,
+    "www_root": "./dashboard_web"
   },
   "blast": {
     "delay_between_seconds": 8,

@@ -78,6 +78,12 @@ add_executable(wa_api_server
   src/util.cpp
   src/props.cpp
   src/titanium.cpp
+  src/contacts.cpp
+  src/templates.cpp
+  src/scheduler.cpp
+  src/simulate.cpp
+  src/excel.cpp
+  src/web.cpp
 )
 
 target_include_directories(wa_api_server PRIVATE

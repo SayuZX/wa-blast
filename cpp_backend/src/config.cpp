@@ -87,7 +87,10 @@ bool load(const std::string& path, Config& out, std::string& err) {
     const auto& st = j["storage"];
     out.db_path = s(st, "db_path", out.db_path);
     out.log_retention_days = i(st, "log_retention_days", out.log_retention_days);
+    out.www_root = s(st, "www_root", out.www_root);
   }
+  // Simulation mode (flat).
+  out.simulate = b(j, "simulate", out.simulate);
 
   if (j.contains("profiles") && j["profiles"].is_array()) {
     // New flat schema: "profiles": ["WA_1","WA_2",...]

@@ -9,6 +9,7 @@
 #include "adb.h"
 #include "config.h"
 #include "logger.h"
+#include "simulate.h"
 #include "store.h"
 #include "util.h"
 
@@ -132,6 +133,17 @@ TargetResult send_one(const std::string& profile,
                       const std::string& message) {
   TargetResult res;
   res.number = number;
+
+  // Simulation mode: skip real ADB, log a fake SUCCESS.
+  if (simulate::enabled()) {
+    simulate::maybe_simulate_send(profile, number, message);
+    res.status = Status::SUCCESS;
+    res.attempts = 1;
+    res.error_code = 0;
+    res.error_message = "SIMULATED";
+    res.duration_ms = 0;
+    return res;
+  }
 
   int max_retries = g_cfg ? g_cfg->blast.max_retries : 3;
   const auto& backoff = g_cfg ? g_cfg->blast.backoff_seconds : std::vector<int>{5, 10, 20};

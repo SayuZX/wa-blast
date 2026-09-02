@@ -46,6 +46,8 @@ struct Config {
 
   std::string db_path = "./wa_harness.db";
   int log_retention_days = 7;
+  std::string www_root = "./dashboard_web";  // static dashboard dir
+  bool simulate = false;                      // simulation mode (non-root)
 
   std::vector<Profile> profiles;
 

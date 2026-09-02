@@ -34,11 +34,17 @@
 #include "auth.h"
 #include "blast.h"
 #include "config.h"
+#include "contacts.h"
+#include "excel.h"
 #include "logger.h"
 #include "props.h"
+#include "scheduler.h"
+#include "simulate.h"
 #include "store.h"
+#include "templates.h"
 #include "titanium.h"
 #include "util.h"
+#include "web.h"
 
 // ---------------------------------------------------------------------------
 // Global state
@@ -124,7 +130,18 @@ static void broadcast_sse(const std::string& data) {
 // ---------------------------------------------------------------------------
 int main(int argc, char** argv) {
   std::string cfg_path = "config.json";
-  if (argc > 1) cfg_path = argv[1];
+  bool simulate_flag = false;
+  for (int i = 1; i < argc; i++) {
+    std::string a = argv[i];
+    if (a == "--simulate") { simulate_flag = true; }
+    else if (a.rfind("--config=", 0) == 0) { cfg_path = a.substr(9); }
+    else if (i == 1 && a != "server" && a != "switch" && a != "send" && a != "blast"
+             && a != "status" && a != "profile" && a != "logs" && a != "--simulate"
+             && a.rfind("--", 0) != 0) {
+      // First positional non-flag = config path (back-compat).
+      cfg_path = a;
+    }
+  }
 
   std::string err;
   if (!conf::load(cfg_path, g_config, err)) {
@@ -132,10 +149,23 @@ int main(int argc, char** argv) {
     return 1;
   }
 
+  // Simulation mode: --simulate flag OR config.simulate OR no root.
+  if (simulate_flag || g_config.simulate) {
+    simulate::set_enabled(true);
+  } else {
+    // Auto-detect: if `su` unavailable, enable simulation.
+    adb::Result r = adb::shell("id");
+    if (!r.ok() || r.stdout_.find("uid=0") == std::string::npos) {
+      logger::warn("root not detected — enabling simulation mode");
+      simulate::set_enabled(true);
+    }
+  }
+
   // Wire config into the sub-modules.
   adb::set_config(&g_config);
   auth::set_config(&g_config);
   blast::set_config(&g_config);
+  web::set_www_root(g_config.www_root);
 
   if (!store::open(g_config.db_path, err)) {
     logger::error("sqlite open failed: " + err);
@@ -629,10 +659,161 @@ int main(int argc, char** argv) {
         return crow::response(j.dump());
       });
 
-  // --- / (root) ---
+  // --- Contacts ---
+  CROW_ROUTE(app, "/api/contacts")
+      .methods("GET"_method)([](const crow::request& req) {
+        if (!auth::verify(extract_key(req)))
+          return crow::response(401, "{\"error\":\"unauthorized\"}");
+        std::string grp = req.url_params.get("grp") ? req.url_params.get("grp") : "";
+        nlohmann::json j;
+        j["contacts"] = contacts::list(grp);
+        return crow::response(j.dump());
+      });
+
+  CROW_ROUTE(app, "/api/contacts/import")
+      .methods("POST"_method)([](const crow::request& req) {
+        if (!auth::verify(extract_key(req)))
+          return crow::response(401, "{\"error\":\"unauthorized\"}");
+        auto body = nlohmann::json::parse(req.body, nullptr, false);
+        if (body.is_discarded()) return crow::response(400, "{\"error\":\"bad json\"}");
+        std::string filename = body.value("filename", "");
+        std::string content = body.value("content", "");
+        if (content.empty()) return crow::response(400, "{\"error\":\"content required\"}");
+        auto rows = excel::parse(filename, content);
+        nlohmann::json result = contacts::import(rows);
+        return crow::response(result.dump());
+      });
+
+  CROW_ROUTE(app, "/api/contacts")
+      .methods("POST"_method)([](const crow::request& req) {
+        if (!auth::verify(extract_key(req)))
+          return crow::response(401, "{\"error\":\"unauthorized\"}");
+        auto body = nlohmann::json::parse(req.body, nullptr, false);
+        if (body.is_discarded()) return crow::response(400, "{\"error\":\"bad json\"}");
+        std::string name = body.value("name", "");
+        std::string phone = body.value("phone", "");
+        if (phone.empty()) return crow::response(400, "{\"error\":\"phone required\"}");
+        nlohmann::json r = contacts::add(name, phone, body.value("grp", ""),
+                                         body.contains("custom") ? body["custom"] : nlohmann::json::object());
+        return crow::response(r.dump());
+      });
+
+  // --- Templates ---
+  CROW_ROUTE(app, "/api/templates")
+      .methods("GET"_method)([](const crow::request& req) {
+        if (!auth::verify(extract_key(req)))
+          return crow::response(401, "{\"error\":\"unauthorized\"}");
+        nlohmann::json j;
+        j["templates"] = tmpl::list();
+        return crow::response(j.dump());
+      });
+
+  CROW_ROUTE(app, "/api/templates")
+      .methods("POST"_method)([](const crow::request& req) {
+        if (!auth::verify(extract_key(req)))
+          return crow::response(401, "{\"error\":\"unauthorized\"}");
+        auto body = nlohmann::json::parse(req.body, nullptr, false);
+        if (body.is_discarded()) return crow::response(400, "{\"error\":\"bad json\"}");
+        std::string name = body.value("name", "");
+        std::string tbody = body.value("body", "");
+        if (name.empty() || tbody.empty())
+          return crow::response(400, "{\"error\":\"name and body required\"}");
+        int id = body.value("id", -1);
+        return crow::response(tmpl::save(name, tbody, id).dump());
+      });
+
+  // --- Send template (personalised) ---
+  CROW_ROUTE(app, "/api/send/template")
+      .methods("POST"_method)([](const crow::request& req) {
+        if (!auth::verify(extract_key(req)))
+          return crow::response(401, "{\"error\":\"unauthorized\"}");
+        auto body = nlohmann::json::parse(req.body, nullptr, false);
+        if (body.is_discarded()) return crow::response(400, "{\"error\":\"bad json\"}");
+        int template_id = body.value("template_id", -1);
+        std::string phone = body.value("phone", "");
+        std::string profile = body.value("profile", g_config.active_profile);
+        nlohmann::json vars = body.contains("variables") ? body["variables"] : nlohmann::json::object();
+
+        nlohmann::json t = tmpl::get(template_id);
+        if (t.is_null()) return crow::response(404, "{\"error\":\"template not found\"}");
+        std::string message = tmpl::render(t.value("body", ""), vars);
+
+        blast::TargetResult r;
+        if (simulate::enabled()) {
+          simulate::maybe_simulate_send(profile, phone, message);
+          r.status = blast::Status::SUCCESS;
+          r.number = phone;
+        } else {
+          r = blast::send_one(profile, phone, message);
+        }
+        nlohmann::json j;
+        j["phone"] = r.number;
+        j["status"] = blast::status_str(r.status);
+        j["message"] = message;
+        return crow::response(j.dump());
+      });
+
+  // --- Schedules ---
+  CROW_ROUTE(app, "/api/schedules")
+      .methods("GET"_method)([](const crow::request& req) {
+        if (!auth::verify(extract_key(req)))
+          return crow::response(401, "{\"error\":\"unauthorized\"}");
+        std::string status = req.url_params.get("status") ? req.url_params.get("status") : "";
+        nlohmann::json j;
+        j["schedules"] = sched::list(status);
+        return crow::response(j.dump());
+      });
+
+  CROW_ROUTE(app, "/api/schedules")
+      .methods("POST"_method)([](const crow::request& req) {
+        if (!auth::verify(extract_key(req)))
+          return crow::response(401, "{\"error\":\"unauthorized\"}");
+        auto body = nlohmann::json::parse(req.body, nullptr, false);
+        if (body.is_discarded()) return crow::response(400, "{\"error\":\"bad json\"}");
+        return crow::response(sched::create(body).dump());
+      });
+
+  CROW_ROUTE(app, "/api/schedules/<string>")
+      .methods("DELETE"_method)([](const crow::request& req, const std::string& id) {
+        if (!auth::verify(extract_key(req)))
+          return crow::response(401, "{\"error\":\"unauthorized\"}");
+        bool ok = sched::remove(id);
+        return crow::response(ok ? "{\"deleted\":true}" : "{\"deleted\":false}");
+      });
+
+  // --- SSE events ---
+  CROW_ROUTE(app, "/api/events")
+  ([](const crow::request& req, crow::response& res) {
+    // Stream a single snapshot + keep connection open (best-effort SSE).
+    res.set_header("Content-Type", "text/event-stream");
+    res.set_header("Cache-Control", "no-cache");
+    res.set_header("Connection", "keep-alive");
+    nlohmann::json logs = store::list_logs("", "", "", 50);
+    std::string payload = "data: " + logs.dump() + "\n\n";
+    res.write(payload);
+    res.end();
+  });
+
+  // --- / (root): serve dashboard ---
   CROW_ROUTE(app, "/")
   ([]() {
-    return crow::response("{\"service\":\"wa_api_server\",\"docs\":\"/docs\",\"health\":\"/api/health\"}");
+    std::string html = web::read_file("index.html");
+    if (html.empty()) {
+      return crow::response("{\"service\":\"wa_api_server\",\"docs\":\"/docs\",\"health\":\"/api/health\"}");
+    }
+    crow::response res(html);
+    res.set_header("Content-Type", "text/html");
+    return res;
+  });
+
+  // --- static assets (css/js) ---
+  CROW_ROUTE(app, "/static/<path>")
+  ([](const std::string& path) {
+    std::string content = web::read_file(path);
+    if (content.empty()) return crow::response(404, "not found");
+    crow::response res(content);
+    res.set_header("Content-Type", web::mime_type(path));
+    return res;
   });
 
   // --- /openapi.yaml ---
@@ -659,9 +840,12 @@ int main(int argc, char** argv) {
   });
 
   logger::info("Starting wa_api_server on " + g_config.host + ":" + std::to_string(g_config.port));
+  logger::info("Simulation mode: " + std::string(simulate::enabled() ? "ON" : "OFF"));
+  sched::start();
   app.port(g_config.port).multithreaded().run();
 
   // Shutdown.
+  sched::stop();
   g_running = false;
   for (auto& t : g_workers) if (t.joinable()) t.join();
   blast::reset();
