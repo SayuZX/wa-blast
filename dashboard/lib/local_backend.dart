@@ -2,23 +2,21 @@ import 'dart:convert';
 
 import 'root_service.dart';
 
-/// Local backend — talks to the bundled `wa_apid` C++ binary via the platform
-/// channel. When [simulate] is true (non-root mode), all operations run
-/// against an in-memory store instead of the binary, so the dashboard is
-/// fully usable on a non-rooted device/emulator for QA.
+/// Local backend — all operations are REAL (no simulation).
+///
+/// - root mode (default on rooted device): run the bundled `wa_apid` C++
+///   binary via `su` for profiles/messages/logs (ADB automation).
+/// - non-root mode: message sending falls back to the Accessibility Service;
+///   profiles/logs still run through the binary (which auto-detects and runs
+///   in its own non-root path) — no fake/in-memory data anywhere.
 class LocalBackend {
   LocalBackend() {
-    _simulate = true;  // default safe on emulator
+    _rootMode = true;
   }
 
-  bool _simulate = true;
-  bool get simulate => _simulate;
-  void setSimulate(bool v) => _simulate = v;
-
-  // In-memory simulation store.
-  final Map<String, Map<String, dynamic>> _profiles = {};
-  final List<Map<String, dynamic>> _logs = [];
-  String _active = '';
+  bool _rootMode = true;
+  bool get rootMode => _rootMode;
+  void setRootMode(bool v) => _rootMode = v;
 
   static const _binary = RootService.binaryPath;
 
@@ -47,114 +45,51 @@ class LocalBackend {
     }
   }
 
-  void _simLog(String status, String msg, {String profile = '', String target = ''}) {
-    _logs.insert(0, {
-      'timestamp': DateTime.now().toIso8601String(),
-      'profile': profile,
-      'target': target,
-      'status': status,
-      'message': msg,
-    });
-  }
+  // ---- status / profiles (real, from binary) ----
+  Future<Map<String, dynamic>> status() => _run('status');
+  Future<Map<String, dynamic>> listProfiles() => _run('status');
 
-  // ---- status ----
-  Future<Map<String, dynamic>> status() async {
-    if (!_simulate) return _run('status');
-    return {
-      'active_profile': _active,
-      'profiles': _profiles.keys.toList(),
-      'mode': 'simulation',
-    };
-  }
+  Future<Map<String, dynamic>> switchProfile(String name) => _run('switch $name');
+  Future<Map<String, dynamic>> createProfile(String name) => _run('profile add $name');
+  Future<Map<String, dynamic>> restoreProfile(String name) => _run('profile restore $name');
+  Future<Map<String, dynamic>> deleteProfile(String name) => _run('profile delete $name');
+  Future<Map<String, dynamic>> exportProfile(String name) => _run('profile export $name');
+  Future<Map<String, dynamic>> editProfile(String name, Map<String, dynamic> fields) =>
+      _run('profile edit $name ${jsonEncode(fields)}');
 
-  Future<Map<String, dynamic>> listProfiles() => status();
-
-  // ---- profiles ----
-  Future<Map<String, dynamic>> switchProfile(String name) async {
-    if (!_simulate) return _run('switch $name');
-    _active = name;
-    _simLog('SUCCESS', 'Switched to $name', profile: name);
-    return {'active': name};
-  }
-
-  Future<Map<String, dynamic>> createProfile(String name) async {
-    if (!_simulate) return _run('profile add $name');
-    _profiles[name] = {
-      'name': name,
-      'status': 'inactive',
-      'created_at': DateTime.now().toIso8601String(),
-    };
-    _simLog('SUCCESS', 'Created profile $name', profile: name);
-    return {'created': name};
-  }
-
-  Future<Map<String, dynamic>> restoreProfile(String name) async {
-    if (!_simulate) return _run('profile restore $name');
-    _simLog('SUCCESS', 'Restored $name', profile: name);
-    return {'restored': name};
-  }
-
-  Future<Map<String, dynamic>> deleteProfile(String name) async {
-    if (!_simulate) return _run('profile delete $name');
-    _profiles.remove(name);
-    if (_active == name) _active = '';
-    _simLog('SUCCESS', 'Deleted $name', profile: name);
-    return {'deleted': name};
-  }
-
-  Future<Map<String, dynamic>> exportProfile(String name) async {
-    if (!_simulate) return _run('profile export $name');
-    _simLog('SUCCESS', 'Exported $name', profile: name);
-    return {'exported': name};
-  }
-
-  Future<Map<String, dynamic>> editProfile(String name, Map<String, dynamic> fields) async {
-    if (!_simulate) return _run('profile edit $name ${jsonEncode(fields)}');
-    final newName = fields['name'] as String? ?? name;
-    if (newName != name && _profiles.containsKey(name)) {
-      _profiles[newName] = _profiles.remove(name)!;
-      _profiles[newName]!['name'] = newName;
-      if (_active == name) _active = newName;
-    }
-    _simLog('SUCCESS', 'Renamed $name -> $newName', profile: name);
-    return {'edited': name, 'new_name': newName};
-  }
-
-  // ---- messages ----
+  // ---- messages (real) ----
   Future<Map<String, dynamic>> sendMessage(String number, String message) async {
-    if (_simulate) {
-      _simLog('SUCCESS', '[SIMULASI] Mengirim ke $number : $message',
-          profile: _active, target: number);
-      return {'phone': number, 'status': 'SUCCESS'};
+    if (_rootMode) {
+      // Root: ADB automation via binary.
+      return _run('send $number ${_shellQuote(message)}');
     }
-    // Real automation. Prefer the binary (root); if it fails, try accessibility.
-    try {
-      return await _run('send $number ${_shellQuote(message)}');
-    } catch (_) {
-      final acc = await RootService.sendViaAccessibility(number, message);
-      if (acc == 'queued') {
-        _simLog('SUCCESS', 'Via accessibility: $number', profile: _active, target: number);
-        return {'phone': number, 'status': 'SUCCESS'};
-      }
-      throw LocalBackendException('automation failed ($acc)');
+    // Non-root: Accessibility Service automation.
+    final acc = await RootService.sendViaAccessibility(number, message);
+    if (acc == 'queued') {
+      return {'phone': number, 'status': 'SUCCESS', 'method': 'accessibility'};
     }
+    throw LocalBackendException('send failed ($acc)');
   }
 
   Future<Map<String, dynamic>> blast(List<String> targets, String message) async {
-    if (!_simulate) return _run('blast ${_shellQuote(jsonEncode(targets))} ${_shellQuote(message)}');
-    int ok = 0;
-    for (final t in targets) {
-      _simLog('SUCCESS', '[SIMULASI] Mengirim ke $t : $message',
-          profile: _active, target: t);
-      ok++;
+    if (_rootMode) {
+      return _run('blast ${_shellQuote(jsonEncode(targets))} ${_shellQuote(message)}');
     }
-    return {'total': targets.length, 'succeeded': ok, 'failed': 0};
+    // Non-root: iterate via accessibility.
+    int ok = 0, fail = 0;
+    for (final t in targets) {
+      final acc = await RootService.sendViaAccessibility(t, message);
+      if (acc == 'queued') {
+        ok++;
+      } else {
+        fail++;
+      }
+      await Future.delayed(const Duration(seconds: 5));
+    }
+    return {'total': targets.length, 'succeeded': ok, 'failed': fail};
   }
 
-  Future<Map<String, dynamic>> logs() async {
-    if (!_simulate) return _run('logs');
-    return {'logs': _logs};
-  }
+  Future<Map<String, dynamic>> logs() => _run('logs');
 
   static String _shellQuote(String s) => "'${s.replaceAll("'", "'\\''")}'";
 }
