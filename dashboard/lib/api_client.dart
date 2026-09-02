@@ -114,19 +114,88 @@ class ApiClient {
     return (await _decode(res)) as Map<String, dynamic>;
   }
 
+  /// Parse an uploaded CSV/TXT file client-side, then send as a JSON batch
+  /// via `/message/batch`.
+  ///
+  /// The Vercel backend has no multipart `/message/batch/upload` endpoint, so
+  /// we do the parsing here (in Dart) and reuse the JSON batch endpoint. This
+  /// works against BOTH the local and Vercel backends.
   Future<Map<String, dynamic>> batchUpload(
     String filename,
     List<int> bytes,
   ) async {
-    final req = http.MultipartRequest('POST', _uri('/message/batch/upload'));
-    req.headers.addAll(_headers());
-    req.files.add(
-      http.MultipartFile.fromBytes('file', bytes, filename: filename),
-    );
-    final streamed = await _client.send(req);
-    final res = await http.Response.fromStream(streamed);
-    _throwIfError(res);
-    return (await _decode(res)) as Map<String, dynamic>;
+    final items = _parseBatchFile(filename, bytes);
+    if (items.isEmpty) {
+      throw ApiException(400, 'No valid rows parsed');
+    }
+    final result = await batchMessage(items);
+    result['parsed'] = items.length;
+    return result;
+  }
+
+  List<Map<String, String>> _parseBatchFile(String filename, List<int> bytes) {
+    final text = utf8.decode(bytes, allowMalformed: true);
+    final items = <Map<String, String>>[];
+
+    if (filename.toLowerCase().endsWith('.csv')) {
+      final lines = text.split('\n');
+      for (var i = 0; i < lines.length; i++) {
+        final line = lines[i].trim();
+        if (line.isEmpty) continue;
+        final cols = _splitCsvLine(line);
+        // Skip header row.
+        if (i == 0 &&
+            cols.isNotEmpty &&
+            ['number', 'recipient', 'to', 'phone'].contains(cols[0].toLowerCase())) {
+          continue;
+        }
+        if (cols.length >= 2 && cols[0].isNotEmpty && cols[1].isNotEmpty) {
+          items.add({'number': cols[0], 'message': cols[1]});
+        }
+      }
+    } else {
+      // .txt — tab or comma separated.
+      for (final line in text.split('\n')) {
+        final l = line.trim();
+        if (l.isEmpty || l.startsWith('#')) continue;
+        if (l.contains('\t')) {
+          final idx = l.indexOf('\t');
+          final number = l.substring(0, idx).trim();
+          final message = l.substring(idx + 1).trim();
+          if (number.isNotEmpty && message.isNotEmpty) {
+            items.add({'number': number, 'message': message});
+          }
+        } else if (l.contains(',')) {
+          final idx = l.indexOf(',');
+          final number = l.substring(0, idx).trim();
+          final message = l.substring(idx + 1).trim();
+          if (number.isNotEmpty && message.isNotEmpty) {
+            items.add({'number': number, 'message': message});
+          }
+        }
+      }
+    }
+    return items;
+  }
+
+  /// Minimal CSV line splitter that respects quoted fields.
+  List<String> _splitCsvLine(String line) {
+    final out = <String>[];
+    final sb = StringBuffer();
+    var inQuotes = false;
+    for (var i = 0; i < line.length; i++) {
+      final c = line[i];
+      if (c == '"') {
+        inQuotes = !inQuotes;
+      } else if (c == ',' && !inQuotes) {
+        out.add(sb.toString().trim());
+        sb.clear();
+      } else {
+        sb.write(c);
+      }
+    }
+    out.add(sb.toString().trim());
+    return out;
   }
 
   // ---- logs ----
