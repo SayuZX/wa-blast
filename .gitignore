@@ -35,6 +35,8 @@ dashboard/.idea/
 # ===== Secrets & credentials — JANGAN commit =====
 .env
 .env.*
+!.env.example
+!*.env.example
 *.pem
 *.key
 *.jks
