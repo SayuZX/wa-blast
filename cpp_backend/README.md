@@ -205,5 +205,76 @@ curl -H "$K" "http://localhost:8080/api/logs?status=FAILED&profile=WA_1"
 ## 8. Notes
 
 - Binary is statically linked (libstdc++/libgcc) — no runtime deps.
-- SSE endpoint (`/api/logs/stream`) is stubbed; wire a ring-buffer broadcaster
-  if real-time dashboard streaming is needed (see `broadcast_sse` in main.cpp).
+- SSE endpoint (`/api/events`) streams a snapshot of recent logs; the web
+  dashboard falls back to 5s polling if SSE is unavailable.
+
+---
+
+## 9. Fitur lengkap (CRM + Blast + Schedule)
+
+Selain send/blast, binary juga menyediakan:
+
+| Modul | Endpoint | Fungsi |
+|-------|----------|--------|
+| Kontak | `GET/POST /api/contacts`, `POST /api/contacts/import` | Manajemen kontak + import CSV/XLSX |
+| Template | `GET/POST /api/templates` | Template dengan placeholder `{{nama}}`, `{{order}}`, `{{date}}` |
+| Kirim template | `POST /api/send/template` | Kirim pesan ter-personalisasi |
+| Jadwal | `GET/POST /api/schedules`, `DELETE /api/schedules/{id}` | Penjadwalan (harian/mingguan) |
+| Dashboard | `GET /` | Web dashboard (HTML/CSS/JS) di-serve langsung |
+| SSE | `GET /api/events` | Update log real-time |
+
+### Simulation mode (non-root testing)
+
+```bash
+# Tanpa root — semua fitur CRM jalan, kirim hanya simulasi log.
+./wa_apid --simulate config.json
+
+# Atau set "simulate": true di config.json, atau otomatis terdeteksi jika su tidak ada.
+```
+
+Saat simulation mode, kirim pesan menghasilkan log `[SIMULASI] Mengirim ke +62812 : Halo`
+dan tercatat SUCCESS di DB — sehingga seluruh alur bisnis bisa diuji tanpa HP root.
+
+### Contoh curl (fitur lengkap)
+
+```bash
+K="X-API-Key: supersecret"
+B="http://localhost:8080"
+
+# Kontak: import CSV (content base64/direct) + list
+curl -X POST -H "$K" -H "Content-Type: application/json" \
+  -d '{"filename":"c.csv","content":"Phone,Nama\n+6281,Budi\n+6282,Ani\n"}' \
+  $B/api/contacts/import
+curl -H "$K" "$B/api/contacts"
+
+# Template: buat + kirim ter-personalisasi
+curl -X POST -H "$K" -H "Content-Type: application/json" \
+  -d '{"name":"order","body":"Halo {{nama}}, pesanan {{order}} siap ({{date}})"}' \
+  $B/api/templates
+curl -X POST -H "$K" -H "Content-Type: application/json" \
+  -d '{"template_id":1,"phone":"+6281","variables":{"nama":"Budi","order":"#123"}}' \
+  $B/api/send/template
+
+# Schedule: kirim terjadwal
+curl -X POST -H "$K" -H "Content-Type: application/json" \
+  -d '{"name":"blast-pagi","type":"send","target":"+6281","message":"Halo","run_at":"2026-09-04 08:00:00","recurring":"daily"}' \
+  $B/api/schedules
+curl -H "$K" "$B/api/schedules"
+
+# Logs (filter status)
+curl -H "$K" "$B/api/logs?status=FAILED"
+```
+
+---
+
+## 10. Deploy (produksi root) vs Simulasi
+
+```bash
+# Produksi (device root, via install.sh)
+./install.sh                    # push binary + dashboard + run
+./install.sh --simulate         # non-root simulation
+
+# Akses dashboard di browser:
+adb forward tcp:8080 tcp:8080
+# buka http://localhost:8080
+```
