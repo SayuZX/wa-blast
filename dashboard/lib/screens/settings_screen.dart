@@ -2,9 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:hugeicons/hugeicons.dart';
 import 'package:provider/provider.dart';
 
+import '../root_service.dart';
 import '../state.dart';
 
-/// Settings screen: connection + appearance + behaviour toggles.
+/// Settings screen: root status, appearance, and behaviour toggles.
+///
+/// Note: there is NO backend URL / API key anymore — the C++ binary ships
+/// inside the APK and is called directly via the platform channel.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
 
@@ -13,35 +17,18 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  late final TextEditingController _urlController;
-  late final TextEditingController _keyController;
-  bool _showKey = false;
+  bool? _rooted;
 
   @override
   void initState() {
     super.initState();
-    final state = context.read<HarnessState>();
-    _urlController = TextEditingController(text: state.client.baseUrl);
-    _keyController = TextEditingController(text: state.client.apiKey);
+    _checkRoot();
   }
 
-  @override
-  void dispose() {
-    _urlController.dispose();
-    _keyController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final state = context.read<HarnessState>();
-    await state.saveConfig(
-      _urlController.text.trim(),
-      _keyController.text.trim(),
-    );
+  Future<void> _checkRoot() async {
+    final r = await RootService.checkRoot();
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Saved')),
-    );
+    setState(() => _rooted = r);
   }
 
   @override
@@ -52,51 +39,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        // --- Connection ---
-        _sectionTitle(theme, 'Connection'),
+        // --- Device / backend status ---
+        _sectionTitle(theme, 'Device'),
         const SizedBox(height: 12),
         Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                TextField(
-                  controller: _urlController,
-                  decoration: const InputDecoration(
-                    labelText: 'Backend URL',
-                    hintText: 'http://127.0.0.1:8000',
-                    prefixIcon: HugeIcon(icon: HugeIcons.strokeRoundedLink01),
-                  ),
+          child: Column(
+            children: [
+              ListTile(
+                leading: HugeIcon(
+                  icon: _rooted == true
+                      ? HugeIcons.strokeRoundedCheckmarkCircle01
+                      : HugeIcons.strokeRoundedAlertCircle,
                 ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _keyController,
-                  obscureText: !_showKey,
-                  decoration: InputDecoration(
-                    labelText: 'API Key',
-                    prefixIcon: const HugeIcon(icon: HugeIcons.strokeRoundedKey01),
-                    suffixIcon: IconButton(
-                      icon: HugeIcon(
-                        icon: _showKey
-                            ? HugeIcons.strokeRoundedView
-                            : HugeIcons.strokeRoundedViewOff,
-                      ),
-                      onPressed: () => setState(() => _showKey = !_showKey),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: _save,
-                    icon: const HugeIcon(
-                        icon: HugeIcons.strokeRoundedCheckmarkCircle01),
-                    label: const Text('Save settings'),
-                  ),
-                ),
-              ],
-            ),
+                title: Text(_rooted == true ? 'Root access' : 'No root access'),
+                subtitle: const Text('C++ binary runs on-device via su'),
+              ),
+              const ListTile(
+                leading: HugeIcon(icon: HugeIcons.strokeRoundedCube),
+                title: Text('Backend'),
+                subtitle: Text('wa_apid (bundled C++ binary)'),
+                trailing: HugeIcon(icon: HugeIcons.strokeRoundedLink01),
+              ),
+            ],
           ),
         ),
 
@@ -137,14 +101,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _toggle(
                 icon: HugeIcons.strokeRoundedBubbleChatDownload01,
                 title: 'Clipboard fallback',
-                subtitle: 'Use clipboard if `input text` fails (long text)',
+                subtitle: 'Use clipboard if `input text` fails',
                 value: state.clipboardFallback,
                 onChanged: state.setClipboardFallback,
               ),
               _toggle(
                 icon: HugeIcons.strokeRoundedRefresh,
                 title: 'Retry on fail',
-                subtitle: 'Auto-retry up to 3× with backoff (5/10/20s)',
+                subtitle: 'Auto-retry up to 3× with backoff',
                 value: state.retryOnFail,
                 onChanged: state.setRetryOnFail,
               ),
@@ -177,24 +141,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ],
           ),
         ),
-
-        const SizedBox(height: 24),
-
-        // --- Active profile ---
-        _sectionTitle(theme, 'Active profile'),
-        const SizedBox(height: 12),
-        Card(
-          child: ListTile(
-            leading: const HugeIcon(icon: HugeIcons.strokeRoundedUserCircle),
-            title: Text(
-              state.activeProfile.isEmpty ? 'None' : state.activeProfile,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            subtitle: const Text('Current profile used for sends'),
-          ),
-        ),
       ],
     );
   }
@@ -202,9 +148,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _sectionTitle(ThemeData theme, String text) {
     return Text(
       text,
-      style: theme.textTheme.titleMedium?.copyWith(
-        fontWeight: FontWeight.w600,
-      ),
+      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
     );
   }
 
