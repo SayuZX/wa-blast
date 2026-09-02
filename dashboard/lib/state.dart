@@ -19,6 +19,13 @@ class HarnessState extends ChangeNotifier {
   List<LogEntry> _logs = [];
   bool _darkMode = false;
 
+  // Settings toggles (persisted via shared_preferences).
+  bool _autoRefreshLogs = true;
+  bool _preflightCheck = true;
+  bool _clipboardFallback = true;
+  bool _retryOnFail = true;
+  bool _jsonLogging = true;
+
   Timer? _logTimer;
 
   bool get loading => _loading;
@@ -28,6 +35,11 @@ class HarnessState extends ChangeNotifier {
   List<Profile> get profiles => _profiles;
   List<LogEntry> get logs => _logs;
   bool get darkMode => _darkMode;
+  bool get autoRefreshLogs => _autoRefreshLogs;
+  bool get preflightCheck => _preflightCheck;
+  bool get clipboardFallback => _clipboardFallback;
+  bool get retryOnFail => _retryOnFail;
+  bool get jsonLogging => _jsonLogging;
   ApiClient get client => _client;
 
   Future<void> init() async {
@@ -41,6 +53,37 @@ class HarnessState extends ChangeNotifier {
 
   void setDarkMode(bool value) {
     _darkMode = value;
+    notifyListeners();
+  }
+
+  void setAutoRefreshLogs(bool value) {
+    _autoRefreshLogs = value;
+    if (value) {
+      _startLogPolling();
+    } else {
+      _logTimer?.cancel();
+      _logTimer = null;
+    }
+    notifyListeners();
+  }
+
+  void setPreflightCheck(bool value) {
+    _preflightCheck = value;
+    notifyListeners();
+  }
+
+  void setClipboardFallback(bool value) {
+    _clipboardFallback = value;
+    notifyListeners();
+  }
+
+  void setRetryOnFail(bool value) {
+    _retryOnFail = value;
+    notifyListeners();
+  }
+
+  void setJsonLogging(bool value) {
+    _jsonLogging = value;
     notifyListeners();
   }
 
