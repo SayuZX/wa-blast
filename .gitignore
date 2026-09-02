@@ -12,7 +12,7 @@ htmlcov/
 
 # ===== Node (kalau dipakai untuk Cloud Functions) =====
 node_modules/
-lib/
+/lib/
 dist/
 npm-debug.log*
 *.tsbuildinfo
