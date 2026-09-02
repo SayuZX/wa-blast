@@ -225,7 +225,10 @@ async def list_profiles():
 
 @app.post("/profile", dependencies=[Depends(require_api_key)])
 async def create_profile(req: ProfileCreate):
-    from backend_vercel.spoof_gen import generate_identity
+    try:
+        from backend_vercel.spoof_gen import generate_identity
+    except ImportError:
+        from spoof_gen import generate_identity
 
     name = req.name.strip()
     if not name:
