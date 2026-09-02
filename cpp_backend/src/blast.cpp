@@ -2,11 +2,13 @@
 
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>  // rand()
 #include <fstream>
 #include <thread>
 
 #include "adb.h"
 #include "config.h"
+#include "logger.h"
 #include "store.h"
 #include "util.h"
 
@@ -172,12 +174,55 @@ void blast(const std::string& profile,
   g_blast_running = true;
   int delay = g_cfg ? g_cfg->blast.delay_between_seconds : 8;
 
+  // Anti-ban settings.
+  const bool anti_ban = g_cfg ? g_cfg->blast.anti_ban : true;
+  const int max_per_hour = g_cfg ? g_cfg->blast.max_per_hour : 60;
+  const int cooldown_after = g_cfg ? g_cfg->blast.cooldown_after : 20;
+  const int cooldown_seconds = g_cfg ? g_cfg->blast.cooldown_seconds : 300;
+  const int jitter_seconds = g_cfg ? g_cfg->blast.jitter_seconds : 3;
+
+  int sent_in_window = 0;        // messages sent since last cooldown
+  long long window_start = util::epoch_ms();
+
   for (size_t i = 0; i < targets.size(); i++) {
     if (!g_blast_running) break;  // allow cancellation
+
     TargetResult r = send_one(profile, targets[i], message);
     if (on_progress) on_progress(r);
+    sent_in_window++;
+
+    // --- Anti-ban: hard hourly cap ---
+    if (anti_ban && max_per_hour > 0) {
+      long long elapsed_s = (util::epoch_ms() - window_start) / 1000;
+      if (sent_in_window >= max_per_hour && elapsed_s < 3600) {
+        // Would exceed the hourly cap: stop the blast to avoid blocking.
+        logger::warn("anti-ban: hourly cap reached (" + std::to_string(max_per_hour) +
+                     " msgs). Stopping blast.");
+        g_blast_running = false;
+        break;
+      }
+    }
+
+    // --- Inter-message delay with jitter (only if not last) ---
     if (i + 1 < targets.size()) {
-      std::this_thread::sleep_for(std::chrono::seconds(delay));
+      int actual_delay = delay;
+      if (anti_ban && jitter_seconds > 0) {
+        // Random +/- jitter to look less robotic.
+        int jit = (rand() % (jitter_seconds * 2 + 1)) - jitter_seconds;
+        actual_delay = delay + jit;
+        if (actual_delay < 1) actual_delay = 1;
+      }
+      std::this_thread::sleep_for(std::chrono::seconds(actual_delay));
+    }
+
+    // --- Cooldown every N messages ---
+    if (anti_ban && cooldown_after > 0 && sent_in_window >= cooldown_after &&
+        i + 1 < targets.size()) {
+      logger::info("anti-ban: cooldown " + std::to_string(cooldown_seconds) +
+                   "s after " + std::to_string(sent_in_window) + " messages");
+      std::this_thread::sleep_for(std::chrono::seconds(cooldown_seconds));
+      sent_in_window = 0;
+      window_start = util::epoch_ms();
     }
   }
   g_blast_running = false;
