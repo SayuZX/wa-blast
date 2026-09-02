@@ -41,6 +41,8 @@ class _SendScreenState extends State<SendScreen> {
   }
 
   Future<void> _pickAndUpload() async {
+    // Grab state before any await (avoids use_build_context_synchronously).
+    final state = context.read<HarnessState>();
     // file_picker 12.x API: static `FilePicker.pickFiles(...)` returning
     // a List<PlatformFile> (no `.platform`, no `FilePickerResult`).
     final files = await FilePicker.pickFiles(
@@ -56,9 +58,7 @@ class _SendScreenState extends State<SendScreen> {
       return;
     }
     setState(() => _sending = true);
-    final outcome = await context
-        .read<HarnessState>()
-        .batchUpload(file.name, bytes);
+    final outcome = await state.batchUpload(file.name, bytes);
     if (!mounted) return;
     setState(() => _sending = false);
     if (outcome == null) {
