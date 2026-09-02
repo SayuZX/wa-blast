@@ -35,7 +35,9 @@
 #include "blast.h"
 #include "config.h"
 #include "logger.h"
+#include "props.h"
 #include "store.h"
+#include "titanium.h"
 #include "util.h"
 
 // ---------------------------------------------------------------------------
@@ -150,6 +152,84 @@ int main(int argc, char** argv) {
                                 {"device_model", p.device_model}};
     j["created_at"] = util::now_iso8601();
     store::upsert_profile(j);
+  }
+
+  // --- CLI mode: `wa-cli <command> [args]` --------------------------------
+  // Commands: switch <profile> | send <phone> <msg> | blast <file.txt>
+  //           status | server start | server
+  if (argc >= 2 && std::string(argv[1]) != "server") {
+    std::string cmd = argv[1];
+
+    if (cmd == "status") {
+      nlohmann::json j;
+      j["active_profile"] = g_config.active_profile.empty() ? "WA_1" : g_config.active_profile;
+      j["profiles"] = g_config.profile_names;
+      j["wa_package"] = g_config.target_package;
+      j["api_port"] = g_config.port;
+      std::printf("%s\n", j.dump(2).c_str());
+      return 0;
+    }
+
+    if (cmd == "switch" && argc >= 3) {
+      std::string profile = argv[2];
+      std::string err;
+      // Apply props + titanium restore for the target profile.
+      nlohmann::json spoof;
+      if (props::load("/data/local/tmp/wa_profiles", profile, spoof)) {
+        props::apply(spoof, err);
+      }
+      if (!titanium::switch_to(g_config.target_package,
+                               g_config.active_profile, profile, true, err)) {
+        logger::error("switch failed: " + err);
+        return 1;
+      }
+      g_config.active_profile = profile;
+      std::printf("{\"active\":\"%s\"}\n", profile.c_str());
+      return 0;
+    }
+
+    if (cmd == "send" && argc >= 4) {
+      std::string phone = argv[2];
+      std::string message = argv[3];
+      blast::TargetResult r = blast::send_one(g_config.active_profile, phone, message);
+      nlohmann::json j;
+      j["number"] = r.number;
+      j["status"] = blast::status_str(r.status);
+      j["attempts"] = r.attempts;
+      j["error_message"] = r.error_message;
+      std::printf("%s\n", j.dump().c_str());
+      return r.status == blast::Status::SUCCESS ? 0 : 1;
+    }
+
+    if (cmd == "blast" && argc >= 3) {
+      std::string file = argv[2];
+      std::ifstream f(file);
+      std::vector<std::string> targets;
+      std::string line;
+      while (std::getline(f, line)) {
+        std::string t = util::trim(line);
+        if (!t.empty()) targets.push_back(t);
+      }
+      std::string message = (argc >= 4) ? argv[3] : "blast";
+      int ok = 0, fail = 0;
+      blast::blast(g_config.active_profile, targets, message,
+                   [&](const blast::TargetResult& r) {
+                     if (r.status == blast::Status::SUCCESS) ok++; else fail++;
+                     std::printf("  %s -> %s\n", r.number.c_str(), blast::status_str(r.status));
+                   });
+      std::printf("{\"total\":%zu,\"succeeded\":%d,\"failed\":%d}\n", targets.size(), ok, fail);
+      return 0;
+    }
+
+    // Unknown command — print usage.
+    std::fprintf(stderr,
+      "usage: wa-cli <command> [args]\n"
+      "  switch <profile>        switch profile (props + data)\n"
+      "  send <phone> <message>  send one message\n"
+      "  blast <file.txt> [msg]  blast to numbers in file\n"
+      "  status                  show active profile + props\n"
+      "  server start            run HTTP API server\n");
+    return 2;
   }
 
   crow::SimpleApp app;
@@ -309,6 +389,104 @@ int main(int argc, char** argv) {
         j["total"] = targets.size();
         return crow::response(j.dump());
       });
+
+  // --- POST /api/send (alias of /api/message/send, prompt schema) ---
+  CROW_ROUTE(app, "/api/send")
+      .methods("POST"_method)([](const crow::request& req) {
+        if (!auth::verify(extract_key(req)))
+          return crow::response(401, "{\"error\":\"unauthorized\"}");
+        auto body = nlohmann::json::parse(req.body, nullptr, false);
+        if (body.is_discarded()) return crow::response(400, "{\"error\":\"bad json\"}");
+        std::string number = body.value("phone", body.value("number", ""));
+        std::string message = body.value("message", "");
+        std::string profile = body.value("profile", g_config.active_profile);
+        if (number.empty() || message.empty())
+          return crow::response(400, "{\"error\":\"phone and message required\"}");
+
+        blast::TargetResult r = blast::send_one(profile, number, message);
+        nlohmann::json j;
+        j["phone"] = r.number;
+        j["profile"] = profile;
+        j["status"] = blast::status_str(r.status);
+        j["attempts"] = r.attempts;
+        j["error_code"] = r.error_code;
+        j["error_message"] = r.error_message;
+        j["duration_ms"] = r.duration_ms;
+        return crow::response(j.dump());
+      });
+
+  // --- POST /api/blast (alias, prompt schema: profile + targets) ---
+  CROW_ROUTE(app, "/api/blast")
+      .methods("POST"_method)([](const crow::request& req) {
+        if (!auth::verify(extract_key(req)))
+          return crow::response(401, "{\"error\":\"unauthorized\"}");
+        auto body = nlohmann::json::parse(req.body, nullptr, false);
+        if (body.is_discarded()) return crow::response(400, "{\"error\":\"bad json\"}");
+        std::string message = body.value("message", "");
+        std::string profile = body.value("profile", g_config.active_profile);
+        std::vector<std::string> targets;
+        if (body.contains("targets") && body["targets"].is_array())
+          for (auto& t : body["targets"]) targets.push_back(t.get<std::string>());
+        if (targets.empty() || message.empty())
+          return crow::response(400, "{\"error\":\"targets and message required\"}");
+
+        if (blast::is_locked())
+          return crow::response(409, "{\"error\":\"another blast is running\"}");
+        if (!blast::try_acquire_lock())
+          return crow::response(409, "{\"error\":\"could not acquire lock\"}");
+
+        std::string job_id = util::uuid4();
+        {
+          std::lock_guard<std::mutex> lk(g_jobs_mu);
+          g_jobs[job_id] = {{"job_id", job_id}, {"status", "running"},
+                            {"total", targets.size()}, {"done", 0},
+                            {"succeeded", 0}, {"failed", 0},
+                            {"results", nlohmann::json::array()}};
+        }
+        g_workers.emplace_back([job_id, profile, targets, message]() {
+          int succeeded = 0, failed = 0, done = 0;
+          nlohmann::json results = nlohmann::json::array();
+          blast::blast(profile, targets, message, [&](const blast::TargetResult& r) {
+            nlohmann::json o;
+            o["number"] = r.number;
+            o["status"] = blast::status_str(r.status);
+            o["attempts"] = r.attempts;
+            o["error_code"] = r.error_code;
+            o["error_message"] = r.error_message;
+            results.push_back(o);
+            done++;
+            if (r.status == blast::Status::SUCCESS) succeeded++; else failed++;
+            std::lock_guard<std::mutex> lk(g_jobs_mu);
+            auto& j = g_jobs[job_id];
+            j["done"] = done; j["succeeded"] = succeeded; j["failed"] = failed;
+            j["results"] = results;
+          });
+          blast::release_lock();
+          std::lock_guard<std::mutex> lk(g_jobs_mu);
+          g_jobs[job_id]["status"] = "finished";
+        });
+
+        nlohmann::json j;
+        j["job_id"] = job_id;
+        j["status"] = "running";
+        j["total"] = targets.size();
+        return crow::response(j.dump());
+      });
+
+  // --- GET /api/status ---
+  CROW_ROUTE(app, "/api/status")
+  ([](const crow::request& req) {
+    if (!auth::verify(extract_key(req)))
+      return crow::response(401, "{\"error\":\"unauthorized\"}");
+    nlohmann::json j;
+    j["active_profile"] = g_config.active_profile.empty() ? "WA_1" : g_config.active_profile;
+    j["profiles"] = g_config.profile_names;
+    j["wa_package"] = g_config.target_package;
+    j["api_port"] = g_config.port;
+    j["blast_running"] = blast::is_locked();
+    j["time"] = util::now_iso8601();
+    return crow::response(j.dump());
+  });
 
   // --- GET /api/blast/{job_id}/status ---
   CROW_ROUTE(app, "/api/blast/<string>")

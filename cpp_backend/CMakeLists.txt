@@ -76,6 +76,8 @@ add_executable(wa_api_server
   src/store.cpp
   src/auth.cpp
   src/util.cpp
+  src/props.cpp
+  src/titanium.cpp
 )
 
 target_include_directories(wa_api_server PRIVATE
