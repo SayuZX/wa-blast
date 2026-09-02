@@ -36,7 +36,7 @@ class HarnessPalette {
 
 /// Light theme — bright neutral surfaces, solid.
 ThemeData buildLightTheme() {
-  final scheme = ColorScheme(
+  const scheme = ColorScheme(
     brightness: Brightness.light,
     primary: HarnessPalette.gray900,
     onPrimary: HarnessPalette.white,
@@ -182,7 +182,7 @@ ThemeData buildLightTheme() {
 
 /// Dark theme — near-black neutral surfaces, solid.
 ThemeData buildDarkTheme() {
-  final scheme = ColorScheme(
+  const scheme = ColorScheme(
     brightness: Brightness.dark,
     primary: HarnessPalette.white,
     onPrimary: HarnessPalette.gray900,
