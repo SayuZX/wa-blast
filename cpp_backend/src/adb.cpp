@@ -1,4 +1,14 @@
-// adb.cpp — ADB implementation via popen(), with shell-escaping helpers.
+// adb.cpp — command execution layer.
+//
+// Two modes (controlled by config `adb.on_device`):
+//   1. ON-DEVICE (default): wa_apid runs INSIDE the Android device (Termux /
+//      adb shell). Commands are run directly via `su -c` (root), because
+//      there is no `adb` binary inside the device.
+//   2. HOST/PC mode: wa_apid runs on a PC and drives the device over `adb`.
+//
+// "send failed non root" was caused by running device commands without root.
+// We now wrap every device command in `su -c` (on-device) so `input`, `am`,
+// `cp`, `uiautomator` all run as root.
 #include "adb.h"
 
 #include <array>
@@ -23,6 +33,7 @@ static std::string cfg_adb_path() { return g_cfg ? g_cfg->adb_path : "adb"; }
 static std::string cfg_serial() { return g_cfg ? g_cfg->adb_serial : ""; }
 static std::string cfg_pkg() { return g_cfg ? g_cfg->target_package : "com.whatsapp"; }
 static std::string cfg_act() { return g_cfg ? g_cfg->target_activity : "com.whatsapp.Main"; }
+static bool cfg_on_device() { return g_cfg ? g_cfg->on_device : true; }
 
 // Minimal single-quote shell escaping for values we embed in commands.
 static std::string shq(const std::string& s) {
@@ -48,13 +59,27 @@ Result run(const std::string& command) {
     r.stdout_ += buf.data();
   }
   int status = pclose(pipe);
-  // pclose returns wait status; extract exit code portably enough.
   r.exit_code = (status == -1) ? -1 : (WEXITSTATUS(status));
   return r;
 }
 
+// Run a command on the device. In on-device mode this wraps `su -c` so the
+// command executes as root (fixes "non root" failures).
 Result shell(const std::string& command) {
-  return run(prefix() + " shell " + command);
+  if (cfg_on_device()) {
+    // Run directly, elevated to root. If `su` is unavailable (non-rooted),
+    // fall back to running without elevation and let the caller see the error.
+    Result r = run("su -c " + shq(command));
+    if (r.ok()) return r;
+    // Retry without su so the real error surfaces (e.g. "Permission denied").
+    Result plain = run(command);
+    plain.stderr_ = "root unavailable: " + r.stderr_ + " | " + plain.stderr_;
+    return plain;
+  }
+  // Host mode: drive over adb.
+  std::string p = cfg_adb_path();
+  if (!cfg_serial().empty()) p += " -s " + cfg_serial();
+  return run(p + " shell " + command);
 }
 
 std::string prefix() {
@@ -65,12 +90,10 @@ std::string prefix() {
 
 bool is_app_foreground() {
   Result r = shell("dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'");
-  // Look for the package name in the focus line.
   return r.stdout_.find(cfg_pkg()) != std::string::npos;
 }
 
 bool ensure_app_foreground() {
-  // Try up to N times to bring the app to front and confirm focus.
   for (int attempt = 0; attempt < 3; attempt++) {
     if (is_app_foreground()) return true;
     start_app();
@@ -81,7 +104,6 @@ bool ensure_app_foreground() {
 }
 
 bool ui_contains(const std::string& needle) {
-  // Dump the UI hierarchy to a temp file and grep it.
   std::string tmp = "/data/local/tmp/ui_dump.xml";
   shell("uiautomator dump " + tmp);
   Result r = shell("cat " + tmp);
@@ -97,26 +119,20 @@ Result keyevent(int code) {
 }
 
 Result input_text(const std::string& text) {
-  // base64-encode to survive spaces/special chars safely through the shell.
   std::string b64 = util::base64_encode(text);
   return shell("input text " + shq(b64));
 }
 
 Result clipboard_set(const std::string& text) {
   std::string b64 = util::base64_encode(text);
-  // Set clipboard via `service call clipboard` (API-level dependent). We use
-  // the widely-supported approach: write text via `cmd clipboard` isn't
-  // universal, so fall back to a helper shell snippet that base64-decodes.
+  // Write decoded text to a temp file, then set clipboard via `cmd`/broadcast.
   std::string cmd =
-      "echo " + shq(b64) +
-      " | base64 -d > /data/local/tmp/clip.txt && "
-      "cat /data/local/tmp/clip.txt | "
-      "su -c 'am broadcast -a clipper.set -e text \"$(cat /data/local/tmp/clip.txt)\"'";
+      "echo " + shq(b64) + " | base64 -d > /data/local/tmp/clip.txt && "
+      "am broadcast -a clipper.set -e text \"$(cat /data/local/tmp/clip.txt)\"";
   return shell(cmd);
 }
 
 Result clipboard_paste() {
-  // Long-press paste: KEYCODE_PASTE (279) is not universal; use menu+paste.
   return keyevent(279);
 }
 

@@ -61,6 +61,7 @@ bool load(const std::string& path, Config& out, std::string& err) {
     out.adb_serial = s(a, "serial", out.adb_serial);
     out.target_package = s(a, "target_package", out.target_package);
     out.target_activity = s(a, "target_activity", out.target_activity);
+    out.on_device = b(a, "on_device", out.on_device);
   }
 
   if (j.contains("blast")) {
@@ -84,17 +85,45 @@ bool load(const std::string& path, Config& out, std::string& err) {
   }
 
   if (j.contains("profiles") && j["profiles"].is_array()) {
-    out.profiles.clear();
-    for (const auto& p : j["profiles"]) {
-      Profile pr;
-      pr.name = s(p, "name", "");
-      pr.android_user = i(p, "android_user", 0);
-      pr.imei = s(p, "imei", "");
-      pr.android_id = s(p, "android_id", "");
-      pr.device_model = s(p, "device_model", "");
-      if (!pr.name.empty()) out.profiles.push_back(pr);
+    // New flat schema: "profiles": ["WA_1","WA_2",...]
+    bool is_strings = true;
+    for (const auto& p : j["profiles"]) if (!p.is_string()) { is_strings = false; break; }
+
+    if (is_strings) {
+      out.profile_names.clear();
+      for (const auto& p : j["profiles"]) out.profile_names.push_back(p.get<std::string>());
+      // Seed structured profiles from names.
+      for (const auto& name : out.profile_names) {
+        Profile pr;
+        pr.name = name;
+        pr.android_user = (name == "WA_1") ? 0 : 10;
+        out.profiles.push_back(pr);
+      }
+    } else {
+      out.profiles.clear();
+      for (const auto& p : j["profiles"]) {
+        Profile pr;
+        pr.name = s(p, "name", "");
+        pr.android_user = i(p, "android_user", 0);
+        pr.imei = s(p, "imei", "");
+        pr.android_id = s(p, "android_id", "");
+        pr.device_model = s(p, "device_model", "");
+        if (!pr.name.empty()) out.profiles.push_back(pr);
+      }
     }
   }
+
+  // New flat fields.
+  out.active_profile = s(j, "active_profile", out.active_profile);
+  out.delay_between_messages_ms = i(j, "delay_between_messages_ms", out.delay_between_messages_ms);
+  out.max_retry = i(j, "max_retry", out.max_retry);
+  out.wa_package = s(j, "wa_package", out.wa_package);
+  if (!out.wa_package.empty()) out.target_package = out.wa_package;
+  // "api_port" / "api_key" flat aliases.
+  if (j.contains("api_port")) out.port = i(j, "api_port", out.port);
+  if (j.contains("api_key")) out.api_key = s(j, "api_key", out.api_key);
+  // "adb_path" flat alias.
+  if (j.contains("adb_path")) out.adb_path = s(j, "adb_path", out.adb_path);
 
   return true;
 }

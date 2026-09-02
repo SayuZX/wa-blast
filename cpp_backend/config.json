@@ -1,30 +1,23 @@
 {
-  "server": {
-    "host": "0.0.0.0",
-    "port": 8080,
-    "api_key": "CHANGE_ME_GENERATE_A_RANDOM_KEY",
-    "threads": 4
-  },
-  "adb": {
-    "path": "adb",
-    "serial": "",
-    "target_package": "com.whatsapp",
-    "target_activity": "com.whatsapp.Main"
-  },
-  "blast": {
-    "delay_between_seconds": 8,
-    "max_retries": 3,
-    "backoff_seconds": [5, 10, 20],
-    "preflight_check": true,
-    "lock_file": "/data/local/tmp/.wa_lock",
-    "fallback_clipboard": true
-  },
+  "profiles": ["WA_1", "WA_2", "WA_3"],
+  "active_profile": "WA_1",
+  "api_port": 8080,
+  "api_key": "CHANGE_ME_GENERATE_A_RANDOM_KEY",
+  "delay_between_messages_ms": 8000,
+  "max_retry": 3,
+  "adb_path": "/system/bin/adb",
+  "wa_package": "com.whatsapp",
+  "target_activity": "com.whatsapp.Main",
+  "on_device": true,
   "storage": {
     "db_path": "./wa_harness.db",
     "log_retention_days": 7
   },
-  "profiles": [
-    { "name": "WA_1", "android_user": 0, "imei": "", "android_id": "", "device_model": "" },
-    { "name": "WA_2", "android_user": 10, "imei": "", "android_id": "", "device_model": "" }
-  ]
+  "blast": {
+    "delay_between_seconds": 8,
+    "backoff_seconds": [5, 10, 20],
+    "preflight_check": true,
+    "fallback_clipboard": true,
+    "lock_file": "/data/local/tmp/.wa_lock"
+  }
 }

@@ -83,13 +83,17 @@ static int do_send_attempt(const std::string& number, const std::string& message
   // Preflight: ensure app foreground.
   if (g_cfg && g_cfg->blast.preflight_check) {
     if (!adb::ensure_app_foreground()) {
-      err = "WhatsApp not focused / preflight failed";
+      err = "WhatsApp not focused / preflight failed (check root + dumpsys window)";
       return 1;
     }
   }
 
   // Open the chat via deep link.
   adb::Result r = adb::open_chat(number);
+  if (!r.ok()) {
+    err = "open_chat failed: " + r.stderr_;
+    return 3;
+  }
   std::this_thread::sleep_for(std::chrono::milliseconds(1200));
 
   // Method 1: input text (short text).
@@ -99,18 +103,25 @@ static int do_send_attempt(const std::string& number, const std::string& message
       adb::keyevent(66);  // ENTER
       return 0;
     }
+    // Surface the real error (e.g. "root unavailable", "Permission denied").
+    err = "input_text failed: " + r.stderr_;
+    // Fall through to clipboard fallback if enabled.
   }
 
   // Method 2: clipboard fallback (long/special text).
   if (g_cfg && g_cfg->blast.fallback_clipboard) {
-    adb::clipboard_set(message);
+    adb::Result cr = adb::clipboard_set(message);
+    if (!cr.ok()) {
+      err = "clipboard_set failed: " + cr.stderr_;
+      return 2;
+    }
     adb::clipboard_paste();
     adb::keyevent(66);  // ENTER
     err = "";
     return 0;  // assume success after paste+enter
   }
 
-  err = "input_text failed and clipboard fallback disabled";
+  if (err.empty()) err = "input_text failed and clipboard fallback disabled";
   return 2;
 }
 

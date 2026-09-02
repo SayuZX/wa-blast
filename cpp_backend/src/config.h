@@ -33,6 +33,7 @@ struct Config {
   std::string adb_serial;
   std::string target_package = "com.whatsapp";
   std::string target_activity = "com.whatsapp.Main";
+  bool on_device = true;  // true: run commands directly via su (binary on device)
 
   BlastConfig blast;
 
@@ -40,6 +41,13 @@ struct Config {
   int log_retention_days = 7;
 
   std::vector<Profile> profiles;
+
+  // --- New flat fields (wa-cli / APK schema, prompt section 8) ---
+  std::vector<std::string> profile_names;   // "profiles": ["WA_1","WA_2",...]
+  std::string active_profile;               // "active_profile": "WA_1"
+  int delay_between_messages_ms = 8000;     // "delay_between_messages_ms"
+  int max_retry = 3;                        // "max_retry"
+  std::string wa_package = "com.whatsapp";  // "wa_package" alias
 };
 
 // Load config from path; returns false + sets err on failure.
