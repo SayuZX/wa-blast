@@ -54,6 +54,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 title: Text(_rooted == true ? 'Root access' : 'No root access'),
                 subtitle: const Text('C++ binary runs on-device via su'),
               ),
+              SwitchListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                secondary: const HugeIcon(icon: HugeIcons.strokeRoundedCube),
+                title: const Text('Non-root (simulation) mode'),
+                subtitle: const Text(
+                  'Simulasikan kirim & profil tanpa root. Matikan untuk pakai binary C++ (butuh root).',
+                ),
+                value: state.simulateMode,
+                onChanged: state.setSimulateMode,
+              ),
               const ListTile(
                 leading: HugeIcon(icon: HugeIcons.strokeRoundedCube),
                 title: Text('Backend'),

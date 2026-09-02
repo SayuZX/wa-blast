@@ -2,16 +2,27 @@ import 'dart:convert';
 
 import 'root_service.dart';
 
-/// Local backend — talks to the bundled `wa_apid` C++ binary directly via the
-/// Kotlin platform channel (`su -c wa_apid ...`), instead of HTTP.
-///
-/// Since the binary ships inside the APK and runs on-device, there is no
-/// separate HTTP server / URL / API key to configure.
+/// Local backend — talks to the bundled `wa_apid` C++ binary via the platform
+/// channel. When [simulate] is true (non-root mode), all operations run
+/// against an in-memory store instead of the binary, so the dashboard is
+/// fully usable on a non-rooted device/emulator for QA.
 class LocalBackend {
+  LocalBackend() {
+    _simulate = true;  // default safe on emulator
+  }
+
+  bool _simulate = true;
+  bool get simulate => _simulate;
+  void setSimulate(bool v) => _simulate = v;
+
+  // In-memory simulation store.
+  final Map<String, Map<String, dynamic>> _profiles = {};
+  final List<Map<String, dynamic>> _logs = [];
+  String _active = '';
+
   static const _binary = RootService.binaryPath;
 
-  /// Run a CLI command and parse the JSON stdout. Returns the parsed map, or
-  /// throws [LocalBackendException] on failure.
+  /// Run a CLI command against the real binary.
   Future<Map<String, dynamic>> _run(String args) async {
     final result = await RootService.execAsRoot('$_binary $args');
     final exitCode = result['exitCode'] as int? ?? -1;
@@ -22,11 +33,9 @@ class LocalBackend {
       throw LocalBackendException(stderr.isNotEmpty ? stderr : 'command failed (exit $exitCode)');
     }
     if (stdout.isEmpty) return {};
-    // The binary may print non-JSON (log lines); find the first JSON object.
     try {
       return jsonDecode(stdout) as Map<String, dynamic>;
     } catch (_) {
-      // Try to extract a JSON object/array from mixed output.
       final start = stdout.indexOf('{');
       final end = stdout.lastIndexOf('}');
       if (start >= 0 && end > start) {
@@ -38,38 +47,102 @@ class LocalBackend {
     }
   }
 
-  // ---- status / health ----
-  Future<Map<String, dynamic>> status() => _run('status');
+  void _simLog(String status, String msg, {String profile = '', String target = ''}) {
+    _logs.insert(0, {
+      'timestamp': DateTime.now().toIso8601String(),
+      'profile': profile,
+      'target': target,
+      'status': status,
+      'message': msg,
+    });
+  }
+
+  // ---- status ----
+  Future<Map<String, dynamic>> status() async {
+    if (!_simulate) return _run('status');
+    return {
+      'active_profile': _active,
+      'profiles': _profiles.keys.toList(),
+      'mode': 'simulation',
+    };
+  }
+
+  Future<Map<String, dynamic>> listProfiles() => status();
 
   // ---- profiles ----
-  Future<Map<String, dynamic>> listProfiles() => _run('status');
+  Future<Map<String, dynamic>> switchProfile(String name) async {
+    if (!_simulate) return _run('switch $name');
+    _active = name;
+    _simLog('SUCCESS', 'Switched to $name', profile: name);
+    return {'active': name};
+  }
 
-  Future<Map<String, dynamic>> switchProfile(String name) =>
-      _run('switch $name');
+  Future<Map<String, dynamic>> createProfile(String name) async {
+    if (!_simulate) return _run('profile add $name');
+    _profiles[name] = {
+      'name': name,
+      'status': 'inactive',
+      'created_at': DateTime.now().toIso8601String(),
+    };
+    _simLog('SUCCESS', 'Created profile $name', profile: name);
+    return {'created': name};
+  }
 
-  Future<Map<String, dynamic>> createProfile(String name) =>
-      _run('profile add $name');
+  Future<Map<String, dynamic>> restoreProfile(String name) async {
+    if (!_simulate) return _run('profile restore $name');
+    _simLog('SUCCESS', 'Restored $name', profile: name);
+    return {'restored': name};
+  }
 
-  Future<Map<String, dynamic>> restoreProfile(String name) =>
-      _run('profile restore $name');
+  Future<Map<String, dynamic>> deleteProfile(String name) async {
+    if (!_simulate) return _run('profile delete $name');
+    _profiles.remove(name);
+    if (_active == name) _active = '';
+    _simLog('SUCCESS', 'Deleted $name', profile: name);
+    return {'deleted': name};
+  }
 
-  Future<Map<String, dynamic>> deleteProfile(String name) =>
-      _run('profile delete $name');
+  Future<Map<String, dynamic>> exportProfile(String name) async {
+    if (!_simulate) return _run('profile export $name');
+    _simLog('SUCCESS', 'Exported $name', profile: name);
+    return {'exported': name};
+  }
 
-  Future<Map<String, dynamic>> exportProfile(String name) =>
-      _run('profile export $name');
-
-  Future<Map<String, dynamic>> editProfile(String name, Map<String, dynamic> fields) =>
-      _run('profile edit $name ${jsonEncode(fields)}');
+  Future<Map<String, dynamic>> editProfile(String name, Map<String, dynamic> fields) async {
+    if (!_simulate) return _run('profile edit $name ${jsonEncode(fields)}');
+    final newName = fields['name'] as String? ?? name;
+    if (newName != name && _profiles.containsKey(name)) {
+      _profiles[newName] = _profiles.remove(name)!;
+      _profiles[newName]!['name'] = newName;
+      if (_active == name) _active = newName;
+    }
+    _simLog('SUCCESS', 'Renamed $name -> $newName', profile: name);
+    return {'edited': name, 'new_name': newName};
+  }
 
   // ---- messages ----
-  Future<Map<String, dynamic>> sendMessage(String number, String message) =>
-      _run('send $number ${_shellQuote(message)}');
+  Future<Map<String, dynamic>> sendMessage(String number, String message) async {
+    if (!_simulate) return _run('send $number ${_shellQuote(message)}');
+    _simLog('SUCCESS', '[SIMULASI] Mengirim ke $number : $message',
+        profile: _active, target: number);
+    return {'phone': number, 'status': 'SUCCESS'};
+  }
 
-  Future<Map<String, dynamic>> blast(List<String> targets, String message) =>
-      _run('blast ${_shellQuote(jsonEncode(targets))} ${_shellQuote(message)}');
+  Future<Map<String, dynamic>> blast(List<String> targets, String message) async {
+    if (!_simulate) return _run('blast ${_shellQuote(jsonEncode(targets))} ${_shellQuote(message)}');
+    int ok = 0;
+    for (final t in targets) {
+      _simLog('SUCCESS', '[SIMULASI] Mengirim ke $t : $message',
+          profile: _active, target: t);
+      ok++;
+    }
+    return {'total': targets.length, 'succeeded': ok, 'failed': 0};
+  }
 
-  Future<Map<String, dynamic>> logs() => _run('logs');
+  Future<Map<String, dynamic>> logs() async {
+    if (!_simulate) return _run('logs');
+    return {'logs': _logs};
+  }
 
   static String _shellQuote(String s) => "'${s.replaceAll("'", "'\\''")}'";
 }
