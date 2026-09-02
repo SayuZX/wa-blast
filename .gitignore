@@ -57,3 +57,12 @@ Thumbs.db
 
 # ===== JDK yang diunduh lokal (bukan bagian proyek) =====
 .jdks/
+
+# ===== C++ backend build artifacts =====
+cpp_backend/build/
+cpp_backend/build-android/
+cpp_backend/test_build/
+cpp_backend/third_party/
+cpp_backend/*.exe
+cpp_backend/*.obj
+cpp_backend/*.db
