@@ -221,12 +221,106 @@ int main(int argc, char** argv) {
       return 0;
     }
 
+    // --- profile <add|restore|delete|export|edit> ---
+    if (cmd == "profile" && argc >= 3) {
+      std::string sub = argv[2];
+
+      if (sub == "add" && argc >= 4) {
+        std::string name = argv[3];
+        // Generate identity + snapshot current data for the new profile.
+        nlohmann::json spoof = props::generate();
+        props::save("/data/local/tmp/wa_profiles", name, spoof);
+        g_config.profile_names.push_back(name);
+        nlohmann::json j;
+        j["created"] = name;
+        j["spoof"] = spoof;
+        std::printf("%s\n", j.dump().c_str());
+        return 0;
+      }
+
+      if (sub == "restore" && argc >= 4) {
+        std::string name = argv[3];
+        std::string err;
+        if (!titanium::restore(g_config.target_package, name, err)) {
+          logger::error("restore failed: " + err);
+          return 1;
+        }
+        std::printf("{\"restored\":\"%s\"}\n", name.c_str());
+        return 0;
+      }
+
+      if (sub == "delete" && argc >= 4) {
+        std::string name = argv[3];
+        std::string cmd = "rm -rf /data/local/tmp/wa_profiles/" + name +
+                          " /data/local/tmp/wa_profiles/props_" + name + ".json";
+        adb::shell(cmd);
+        std::printf("{\"deleted\":\"%s\"}\n", name.c_str());
+        return 0;
+      }
+
+      if (sub == "export" && argc >= 4) {
+        std::string name = argv[3];
+        std::string dest = "/sdcard/wa_exports/" + name;
+        std::string cmd = "mkdir -p /sdcard/wa_exports && cp -rf "
+                          "/data/local/tmp/wa_profiles/" + name + " " + dest;
+        adb::Result r = adb::shell(cmd);
+        nlohmann::json j;
+        j["exported"] = name;
+        j["path"] = dest;
+        j["ok"] = r.ok();
+        std::printf("%s\n", j.dump().c_str());
+        return r.ok() ? 0 : 1;
+      }
+
+      if (sub == "edit" && argc >= 4) {
+        std::string name = argv[3];
+        // Optional: JSON payload with new name/props (argv[4]).
+        std::string new_name = name;
+        if (argc >= 5) {
+          nlohmann::json fields = nlohmann::json::parse(argv[4], nullptr, false);
+          if (!fields.is_discarded() && fields.contains("name")) {
+            new_name = fields["name"].get<std::string>();
+          }
+        }
+        // Rename snapshot dir if name changed.
+        if (new_name != name) {
+          adb::shell("mv /data/local/tmp/wa_profiles/" + name +
+                     " /data/local/tmp/wa_profiles/" + new_name);
+          adb::shell("mv /data/local/tmp/wa_profiles/props_" + name + ".json"
+                     " /data/local/tmp/wa_profiles/props_" + new_name + ".json");
+        }
+        nlohmann::json j;
+        j["edited"] = name;
+        j["new_name"] = new_name;
+        std::printf("%s\n", j.dump().c_str());
+        return 0;
+      }
+
+      std::fprintf(stderr, "unknown profile subcommand: %s\n", sub.c_str());
+      return 2;
+    }
+
+    // --- logs (JSON list) ---
+    if (cmd == "logs") {
+      nlohmann::json logs = store::list_logs("", "", "", 100);
+      nlohmann::json j;
+      j["logs"] = logs;
+      std::printf("%s\n", j.dump().c_str());
+      return 0;
+    }
+
     // Unknown command — print usage.
     std::fprintf(stderr,
       "usage: wa-cli <command> [args]\n"
       "  switch <profile>        switch profile (props + data)\n"
       "  send <phone> <message>  send one message\n"
       "  blast <file.txt> [msg]  blast to numbers in file\n"
+      "  profile add <name>      create profile\n"
+      "  profile restore <name>  restore profile snapshot\n"
+      "  profile delete <name>   delete profile\n"
+      "  profile export <name>   export snapshot to /sdcard\n"
+      "  profile edit <name>     rename profile (or {name:...} json)\n"
+      "  logs                    list recent logs (JSON)\n"
       "  status                  show active profile + props\n"
       "  server start            run HTTP API server\n");
     return 2;
