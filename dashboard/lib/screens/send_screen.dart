@@ -105,7 +105,9 @@ class _SendScreenState extends State<SendScreen> {
         const SizedBox(height: 16),
         ElevatedButton.icon(
           onPressed: _sending ? null : _sendManual,
-          icon: const HugeIcon(icon: HugeIcons.strokeRoundedSent),
+          icon: _sending
+              ? const _SpinningIcon(icon: HugeIcons.strokeRoundedRefresh, size: 18)
+              : const HugeIcon(icon: HugeIcons.strokeRoundedSent, size: 18),
           label: Text(_sending ? 'Sending…' : 'Send message'),
         ),
         const SizedBox(height: 32),
@@ -122,10 +124,49 @@ class _SendScreenState extends State<SendScreen> {
         const SizedBox(height: 16),
         OutlinedButton.icon(
           onPressed: _sending ? null : _pickAndUpload,
-          icon: const HugeIcon(icon: HugeIcons.strokeRoundedUpload01),
+          icon: const HugeIcon(icon: HugeIcons.strokeRoundedQueue01),
           label: const Text('Upload file & run batch'),
         ),
       ],
+    );
+  }
+}
+
+/// A HugeIcon that rotates continuously (used for the "loading" state).
+class _SpinningIcon extends StatefulWidget {
+  const _SpinningIcon({required this.icon, required this.size});
+
+  final List<List<dynamic>> icon;
+  final double size;
+
+  @override
+  State<_SpinningIcon> createState() => _SpinningIconState();
+}
+
+class _SpinningIconState extends State<_SpinningIcon>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return RotationTransition(
+      turns: _controller,
+      child: HugeIcon(icon: widget.icon, size: widget.size),
     );
   }
 }
