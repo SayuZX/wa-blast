@@ -73,25 +73,33 @@ bool apply(const nlohmann::json& spoof, std::string& err) {
 
 nlohmann::json generate() {
   nlohmann::json j;
-  j["imei"] = util::random_hex(7) + util::random_hex(0);  // placeholder 14-digit
-  // Build a valid 15-digit IMEI (14 random + Luhn check).
-  std::string imei14 = util::random_hex(7);
-  // random_hex returns hex; convert to decimal digits for IMEI.
+
+  // Build a valid 15-digit IMEI: 14 random decimal digits + Luhn check digit.
   std::string digits;
-  for (char c : imei14) {
+  digits.reserve(14);
+  // Use random_hex(7) -> 14 hex chars, map each hex nibble to a decimal digit.
+  std::string hex = util::random_hex(7);
+  for (char c : hex) {
     int v = (c >= '0' && c <= '9') ? (c - '0') : (c - 'a' + 10);
     digits += ('0' + (v % 10));
   }
-  while (digits.size() < 14) digits += "0";
-  // Luhn check digit.
+  // Ensure exactly 14 digits.
+  while (digits.size() < 14) digits += '0';
+  if (digits.size() > 14) digits = digits.substr(0, 14);
+
+  // Luhn check digit (IMEI uses "double every other from the right").
   int sum = 0;
   for (int i = 0; i < 14; i++) {
     int d = digits[i] - '0';
-    if (i % 2 == 0) { d *= 2; if (d > 9) d -= 9; }
+    if (i % 2 == 1) {  // odd index (0-based) = every other from right
+      d *= 2;
+      if (d > 9) d -= 9;
+    }
     sum += d;
   }
   int check = (10 - (sum % 10)) % 10;
   j["imei"] = digits + std::to_string(check);
+
   j["android_id"] = util::random_hex(8);  // 16 hex chars
   j["device_model"] = "QA-Device-" + util::random_hex(2);
   j["manufacturer"] = "QALab";
