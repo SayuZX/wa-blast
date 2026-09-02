@@ -1,0 +1,57 @@
+# ===== Python (backend) =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# ===== Node (kalau dipakai untuk Cloud Functions) =====
+node_modules/
+lib/
+dist/
+npm-debug.log*
+*.tsbuildinfo
+
+# ===== Flutter / Dart (dashboard) =====
+dashboard/build/
+dashboard/.dart_tool/
+dashboard/.flutter-plugins
+dashboard/.flutter-plugins-dependencies
+dashboard/.packages
+dashboard/android/.gradle/
+dashboard/android/local.properties
+dashboard/android/app/.cxx/
+dashboard/android/key.properties
+dashboard/ios/Pods/
+dashboard/ios/.symlinks/
+dashboard/.idea/
+*.iml
+
+# ===== Secrets & credentials — JANGAN commit =====
+.env
+.env.*
+*.pem
+*.key
+*.jks
+*.keystore
+service-account*.json
+google-services.json
+
+# ===== Runtime data (snapshots, logs, registries) =====
+data/
+*.log
+
+# ===== OS / editor =====
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# ===== JDK yang diunduh lokal (bukan bagian proyek) =====
+.jdks/
