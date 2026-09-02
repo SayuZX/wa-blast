@@ -57,12 +57,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
               SwitchListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 secondary: const HugeIcon(icon: HugeIcons.strokeRoundedCube),
-                title: const Text('Non-root (simulation) mode'),
+                title: const Text('Root mode'),
                 subtitle: const Text(
-                  'Simulasikan kirim & profil tanpa root. Matikan untuk pakai binary C++ (butuh root).',
+                  'ON = ADB automation (butuh root). OFF = Accessibility Service (non-root).',
                 ),
-                value: state.simulateMode,
-                onChanged: state.setSimulateMode,
+                value: state.rootMode,
+                onChanged: state.setRootMode,
               ),
               const ListTile(
                 leading: HugeIcon(icon: HugeIcons.strokeRoundedCube),

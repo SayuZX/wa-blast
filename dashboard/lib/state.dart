@@ -28,7 +28,7 @@ class HarnessState extends ChangeNotifier {
   bool _clipboardFallback = true;
   bool _retryOnFail = true;
   bool _jsonLogging = true;
-  bool _simulateMode = true;  // default: simulation (non-root) — safe on emulator
+  bool _rootMode = true;  // true = root (binary ADB), false = non-root (accessibility)
 
   Timer? _logTimer;
 
@@ -44,7 +44,7 @@ class HarnessState extends ChangeNotifier {
   bool get clipboardFallback => _clipboardFallback;
   bool get retryOnFail => _retryOnFail;
   bool get jsonLogging => _jsonLogging;
-  bool get simulateMode => _simulateMode;
+  bool get rootMode => _rootMode;
   LocalBackend get backend => _backend;
 
   Future<void> init() async {
@@ -60,9 +60,9 @@ class HarnessState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void setSimulateMode(bool value) {
-    _simulateMode = value;
-    _backend.setSimulate(value);
+  void setRootMode(bool value) {
+    _rootMode = value;
+    _backend.setRootMode(value);
     notifyListeners();
     refresh();
   }
