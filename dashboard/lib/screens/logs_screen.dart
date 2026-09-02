@@ -4,7 +4,8 @@ import 'package:provider/provider.dart';
 
 import '../state.dart';
 
-/// Real-time activity log (polled from backend /logs).
+/// Real-time activity log (polled from backend /api/logs).
+/// Icons: File01 (menu), CheckmarkCircle01 (success), AlertCircle (failed).
 class LogsScreen extends StatelessWidget {
   const LogsScreen({super.key});
 
@@ -17,7 +18,7 @@ class LogsScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            HugeIcon(icon: HugeIcons.strokeRoundedAlignLeft, size: 48),
+            HugeIcon(icon: HugeIcons.strokeRoundedFile01, size: 48),
             SizedBox(height: 16),
             Text('No log activity yet'),
           ],
