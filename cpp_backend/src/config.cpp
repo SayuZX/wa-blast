@@ -117,8 +117,12 @@ bool load(const std::string& path, Config& out, std::string& err) {
   out.active_profile = s(j, "active_profile", out.active_profile);
   out.delay_between_messages_ms = i(j, "delay_between_messages_ms", out.delay_between_messages_ms);
   out.max_retry = i(j, "max_retry", out.max_retry);
-  out.wa_package = s(j, "wa_package", out.wa_package);
-  if (!out.wa_package.empty()) out.target_package = out.wa_package;
+  // "wa_package" overrides target_package ONLY if explicitly present in config
+  // (otherwise the default "com.whatsapp" would clobber a nested adb.target_package).
+  if (j.contains("wa_package") && j["wa_package"].is_string()) {
+    out.wa_package = j["wa_package"].get<std::string>();
+    if (!out.wa_package.empty()) out.target_package = out.wa_package;
+  }
   // "api_port" / "api_key" flat aliases.
   if (j.contains("api_port")) out.port = i(j, "api_port", out.port);
   if (j.contains("api_key")) out.api_key = s(j, "api_key", out.api_key);
