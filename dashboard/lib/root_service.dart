@@ -89,6 +89,23 @@ class RootService {
     return execAsRoot('$binaryPath $args');
   }
 
+  /// Send via the Accessibility Service (non-root automation).
+  /// Returns the status string: "queued", "accessibility_not_enabled",
+  /// "whatsapp_not_installed".
+  static Future<String> sendViaAccessibility(String number, String message) async {
+    try {
+      final result = await _channel.invokeMethod<String>(
+        'sendViaAccessibility',
+        {'number': number, 'message': message},
+      );
+      return result ?? 'error';
+    } on MissingPluginException {
+      return 'not_supported';
+    } catch (e) {
+      return 'error: $e';
+    }
+  }
+
   // Fallback for non-rooted platforms: adb via local process (host dev).
   static Future<Map<String, dynamic>> runAdbHost(String args) async {
     try {

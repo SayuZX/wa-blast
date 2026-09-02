@@ -122,10 +122,22 @@ class LocalBackend {
 
   // ---- messages ----
   Future<Map<String, dynamic>> sendMessage(String number, String message) async {
-    if (!_simulate) return _run('send $number ${_shellQuote(message)}');
-    _simLog('SUCCESS', '[SIMULASI] Mengirim ke $number : $message',
-        profile: _active, target: number);
-    return {'phone': number, 'status': 'SUCCESS'};
+    if (_simulate) {
+      _simLog('SUCCESS', '[SIMULASI] Mengirim ke $number : $message',
+          profile: _active, target: number);
+      return {'phone': number, 'status': 'SUCCESS'};
+    }
+    // Real automation. Prefer the binary (root); if it fails, try accessibility.
+    try {
+      return await _run('send $number ${_shellQuote(message)}');
+    } catch (_) {
+      final acc = await RootService.sendViaAccessibility(number, message);
+      if (acc == 'queued') {
+        _simLog('SUCCESS', 'Via accessibility: $number', profile: _active, target: number);
+        return {'phone': number, 'status': 'SUCCESS'};
+      }
+      throw LocalBackendException('automation failed ($acc)');
+    }
   }
 
   Future<Map<String, dynamic>> blast(List<String> targets, String message) async {
