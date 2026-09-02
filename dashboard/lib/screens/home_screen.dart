@@ -9,7 +9,13 @@ import 'send_screen.dart';
 import 'settings_screen.dart';
 
 /// Root scaffold with a Material 3 bottom navigation bar.
-/// Four sections: Profiles, Send, Logs, Settings.
+/// Four sections: Profiles (dashboard), Send, Logs, Settings.
+///
+/// Icon mapping (Hugeicons, stroke 2px, consistent):
+///   Dashboard  -> LayoutGrid
+///   Send       -> Sent
+///   Logs       -> File01
+///   Settings   -> Settings01
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -59,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onDestinationSelected: (i) => setState(() => _index = i),
         destinations: const [
           NavigationDestination(
-            icon: HugeIcon(icon: HugeIcons.strokeRoundedUserGroup),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedLayoutGrid),
             label: 'Profiles',
           ),
           NavigationDestination(
@@ -67,7 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Send',
           ),
           NavigationDestination(
-            icon: HugeIcon(icon: HugeIcons.strokeRoundedAlignLeft),
+            icon: HugeIcon(icon: HugeIcons.strokeRoundedFile01),
             label: 'Logs',
           ),
           NavigationDestination(

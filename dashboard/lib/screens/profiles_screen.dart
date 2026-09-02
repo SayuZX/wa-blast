@@ -130,14 +130,14 @@ class _ProfileCard extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            // Status dot (solid, no transparency).
-            Container(
-              width: 12,
-              height: 12,
-              decoration: BoxDecoration(
-                color: statusColor,
-                shape: BoxShape.circle,
-              ),
+            // UserCircle icon: thick stroke + solid = active; low opacity = inactive.
+            HugeIcon(
+              icon: HugeIcons.strokeRoundedUserCircle,
+              size: 28,
+              strokeWidth: isActive ? 2.5 : 1.5,
+              color: isActive
+                  ? statusColor
+                  : HarnessPalette.statusInactive,
             ),
             const SizedBox(width: 16),
             Expanded(
@@ -160,11 +160,12 @@ class _ProfileCard extends StatelessWidget {
               ),
             ),
             if (isActive)
-              const HugeIcon(icon: HugeIcons.strokeRoundedTick02, size: 20)
+              const HugeIcon(icon: HugeIcons.strokeRoundedCheckmarkCircle01, size: 20)
             else
-              ElevatedButton(
+              ElevatedButton.icon(
                 onPressed: onSwitch,
-                child: const Text('Switch'),
+                icon: const HugeIcon(icon: HugeIcons.strokeRoundedUserSwitch, size: 16),
+                label: const Text('Switch'),
               ),
           ],
         ),
