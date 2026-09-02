@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(wa_api_server CXX)
+project(wa_api_server CXX C)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,7 +26,9 @@ if(NOT asio_POPULATED)
 endif()
 add_library(asio INTERFACE)
 target_include_directories(asio INTERFACE ${asio_SOURCE_DIR}/asio/include)
-target_compile_definitions(asio INTERFACE ASIO_STANDALONE ASIO_NO_DEPRECATED)
+# NOTE: no ASIO_NO_DEPRECATED — Crow v1.2.0 still uses the deprecated
+# `asio::io_service` alias.
+target_compile_definitions(asio INTERFACE ASIO_STANDALONE)
 
 # --- CrowCpp ---
 FetchContent_Declare(crow
