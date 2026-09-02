@@ -1,0 +1,1787 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<title>WA Engine — Pusat Kendali Multi-Akun</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@hugeicons/core-free-icons@latest/hugeicons.css">
+<script src="https://cdn.jsdelivr.net/npm/@hugeicons/core-free-icons@latest/hugeicons.umd.js" defer></script>
+<style>
+/* =========================================================================
+   WA Engine — Material You (M3) + Fluent Design
+   Palet monokromatik (hitam/putih/skala abu-abu). Tanpa transparansi,
+   tanpa warna mencolok. Seluruh surface solid (opacity: 1).
+   ========================================================================= */
+:root {
+  /* Light theme — neutral scale */
+  --bg:            #f4f4f5;
+  --bg-elev:       #fafafa;
+  --surface:       #ffffff;
+  --surface-2:     #f0f0f1;
+  --surface-3:     #e8e8ea;
+  --border:        #dcdcdf;
+  --border-strong: #c7c7cc;
+  --text:          #19191b;
+  --text-2:        #52525b;
+  --text-3:        #71717a;
+  --inverse:       #ffffff;
+  --inverse-2:     #b0b0b8;
+  --primary:       #3a3a40;   /* neutral primary (no hue) */
+  --on-primary:    #ffffff;
+  --primary-2:     #52525b;
+  --accent:        #52525b;
+  --success:       #3f3f46;   /* neutral success markers */
+  --warn:          #52525b;
+  --danger:        #18181b;
+  --focus-ring:    #52525b;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.10), 0 1px 3px rgba(0,0,0,.06);
+  --shadow-2: 0 4px 12px rgba(0,0,0,.12), 0 2px 4px rgba(0,0,0,.08);
+  --shadow-3: 0 12px 32px rgba(0,0,0,.18);
+  --radius-s: 8px;
+  --radius-m: 14px;
+  --radius-l: 20px;
+  --radius-pill: 999px;
+  --ease: cubic-bezier(.2,0,0,1);
+}
+
+[data-theme="dark"] {
+  --bg:            #0b0b0c;
+  --bg-elev:       #121214;
+  --surface:       #171719;
+  --surface-2:     #1f1f21;
+  --surface-3:     #2a2a2d;
+  --border:        #2c2c30;
+  --border-strong: #3a3a3f;
+  --text:          #e8e8ea;
+  --text-2:        #b4b4bc;
+  --text-3:        #8a8a93;
+  --inverse:       #0b0b0c;
+  --inverse-2:     #52525b;
+  --primary:       #e4e4e7;
+  --on-primary:    #121214;
+  --primary-2:     #c9c9cf;
+  --accent:        #b4b4bc;
+  --success:       #d4d4d8;
+  --warn:          #a1a1aa;
+  --danger:        #f4f4f5;
+  --focus-ring:    #b4b4bc;
+  --shadow-1: 0 1px 2px rgba(0,0,0,.5), 0 1px 3px rgba(0,0,0,.4);
+  --shadow-2: 0 4px 12px rgba(0,0,0,.55), 0 2px 4px rgba(0,0,0,.45);
+  --shadow-3: 0 12px 32px rgba(0,0,0,.6);
+}
+
+/* ---------- Reset & base ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", "Segoe UI Variable", -apple-system, BlinkMacSystemFont,
+    "Inter", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background .2s var(--ease), color .2s var(--ease);
+}
+h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -.01em; }
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; }
+::selection { background: var(--primary-2); color: var(--on-primary); }
+
+/* Scrollbars */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 8px; border: 2px solid var(--bg); }
+::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+::-webkit-scrollbar-track { background: transparent; }
+
+:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; border-radius: 4px; }
+
+/* ---------- App shell ---------- */
+.app {
+  display: grid;
+  grid-template-columns: 264px 1fr;
+  grid-template-rows: 60px 1fr;
+  grid-template-areas: "rail topbar" "rail main";
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* ---------- Sidebar (rail) ---------- */
+.rail {
+  grid-area: rail;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  height: 60px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.brand__mark {
+  width: 32px; height: 32px;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--on-primary);
+  display: grid; place-items: center;
+}
+.brand__mark .hgi { width: 18px; height: 18px; }
+.brand__name { font-weight: 600; font-size: 15px; letter-spacing: -.01em; }
+.brand__sub { font-size: 11px; color: var(--text-3); }
+
+.nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.nav__group {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  padding: 14px 12px 6px;
+}
+.nav__item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-m);
+  color: var(--text-2);
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  font-size: 14px;
+  transition: background .15s var(--ease), color .15s var(--ease);
+  position: relative;
+}
+.nav__item .hgi { width: 20px; height: 20px; flex-shrink: 0; }
+.nav__item:hover { background: var(--surface-2); color: var(--text); }
+.nav__item[aria-current="true"] {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.nav__item[aria-current="true"]::before {
+  content: "";
+  position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+  width: 3px; height: 20px; border-radius: 0 3px 3px 0;
+  background: var(--on-primary);
+}
+
+.rail__foot {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.conn {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--text-2); padding: 4px 6px;
+}
+.conn__dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--text-3);
+}
+.conn[data-state="ok"] .conn__dot { background: #52525b; box-shadow: 0 0 0 3px rgba(82,82,91,.18); }
+.conn[data-state="err"] .conn__dot { background: #18181b; box-shadow: 0 0 0 3px rgba(24,24,27,.18); }
+
+/* ---------- Topbar ---------- */
+.topbar {
+  grid-area: topbar;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px;
+}
+.topbar__title { font-size: 16px; font-weight: 600; }
+.topbar__crumb { color: var(--text-3); font-size: 13px; }
+.topbar__spacer { flex: 1; }
+.topbar .btn { height: 38px; }
+
+/* Icon button */
+.icon-btn {
+  display: inline-grid; place-items: center;
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: background .15s var(--ease), color .15s var(--ease);
+}
+.icon-btn:hover { background: var(--surface-2); color: var(--text); }
+.icon-btn .hgi { width: 20px; height: 20px; }
+
+/* ---------- Main ---------- */
+.main {
+  grid-area: main;
+  overflow-y: auto;
+  padding: 24px;
+  background: var(--bg);
+}
+.view { display: none; }
+.view[data-active="true"] { display: block; animation: fade .18s var(--ease); }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+.view__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+.view__title { font-size: 22px; }
+.view__desc { color: var(--text-3); margin-top: 2px; font-size: 13px; }
+.view__actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ---------- Buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  height: 40px; padding: 0 18px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px; font-weight: 500;
+  cursor: pointer;
+  transition: background .15s var(--ease), box-shadow .15s var(--ease), transform .05s var(--ease);
+  white-space: nowrap;
+}
+.btn .hgi { width: 18px; height: 18px; }
+.btn:hover { background: var(--surface-2); }
+.btn:active { transform: translateY(1px); }
+.btn--primary {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-color: var(--primary);
+}
+.btn--primary:hover { background: var(--primary-2); }
+.btn--ghost { background: transparent; border-color: transparent; color: var(--text-2); }
+.btn--ghost:hover { background: var(--surface-2); color: var(--text); }
+.btn--sm { height: 32px; padding: 0 12px; font-size: 13px; border-radius: 10px; }
+.btn--sm .hgi { width: 16px; height: 16px; }
+.btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+/* ---------- Cards ---------- */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  padding: 20px;
+  box-shadow: var(--shadow-1);
+}
+.card + .card { margin-top: 16px; }
+.card__title { font-size: 15px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.card__title .hgi { width: 18px; height: 18px; color: var(--text-3); }
+.card__sub { color: var(--text-3); font-size: 12.5px; margin-top: 2px; }
+.card__body { margin-top: 14px; }
+
+/* ---------- Grid & stat cards ---------- */
+.grid { display: grid; gap: 16px; }
+.grid--stats { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.grid--2 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  padding: 18px;
+  box-shadow: var(--shadow-1);
+  position: relative;
+  overflow: hidden;
+}
+.stat__label { font-size: 12.5px; color: var(--text-3); font-weight: 500; }
+.stat__value { font-size: 30px; font-weight: 600; letter-spacing: -.02em; margin-top: 4px; line-height: 1; }
+.stat__hint { font-size: 12px; color: var(--text-3); margin-top: 6px; }
+.stat__icon {
+  position: absolute; right: 14px; top: 14px;
+  width: 40px; height: 40px; border-radius: 12px;
+  background: var(--surface-2);
+  display: grid; place-items: center; color: var(--text-2);
+}
+.stat__icon .hgi { width: 20px; height: 20px; }
+
+/* ---------- Forms ---------- */
+.field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.field__label { font-size: 13px; font-weight: 500; color: var(--text-2); }
+.field__hint { font-size: 11.5px; color: var(--text-3); }
+.input, .select, .textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: var(--radius-s);
+  border: 1px solid var(--border-strong);
+  background: var(--bg-elev);
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+  transition: border-color .15s var(--ease), box-shadow .15s var(--ease);
+}
+.textarea { min-height: 110px; resize: vertical; line-height: 1.5; }
+.input:focus, .select:focus, .textarea:focus {
+  outline: none;
+  border-color: var(--focus-ring);
+  box-shadow: 0 0 0 3px rgba(82,82,91,.16);
+}
+.input::placeholder, .textarea::placeholder { color: var(--text-3); }
+.select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--text-3) 50%), linear-gradient(135deg, var(--text-3) 50%, transparent 50%); background-position: calc(100% - 18px) 50%, calc(100% - 13px) 50%; background-size: 5px 5px; background-repeat: no-repeat; padding-right: 34px; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; }
+.row > .field { flex: 1; min-width: 180px; }
+.form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+
+/* ---------- Chips / badges ---------- */
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 11px;
+  border-radius: var(--radius-pill);
+  font-size: 12px; font-weight: 500;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.chip .hgi { width: 14px; height: 14px; }
+.chip--active { background: var(--primary); color: var(--on-primary); border-color: var(--primary); }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: var(--radius-pill);
+  font-size: 11px; font-weight: 600; letter-spacing: .02em;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2); color: var(--text-2);
+}
+.badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.badge--success { background: #ececee; color: #3f3f46; }
+.badge--failed  { background: #e7e7e9; color: #18181b; }
+.badge--retry   { background: #e9e9eb; color: #52525b; }
+.badge--pending { background: #f0f0f1; color: #71717a; }
+[data-theme="dark"] .badge--success { background: #242426; color: #d4d4d8; }
+[data-theme="dark"] .badge--failed  { background: #1d1d1f; color: #f4f4f5; }
+[data-theme="dark"] .badge--retry   { background: #222224; color: #a1a1aa; }
+[data-theme="dark"] .badge--pending { background: #202022; color: #8a8a93; }
+
+/* ---------- Table ---------- */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-m); background: var(--surface); }
+table.tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.tbl thead th {
+  text-align: left; font-weight: 600; font-size: 12px;
+  color: var(--text-3); text-transform: uppercase; letter-spacing: .04em;
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  white-space: nowrap; position: sticky; top: 0; background: var(--surface); z-index: 1;
+}
+.tbl tbody td { padding: 12px 16px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.tbl tbody tr:last-child td { border-bottom: none; }
+.tbl tbody tr { transition: background .12s var(--ease); }
+.tbl tbody tr:hover { background: var(--surface-2); }
+.tbl .num { font-variant-numeric: tabular-nums; }
+.tbl .muted { color: var(--text-3); }
+.tbl .mono { font-family: "Cascadia Code", ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: 12.5px; }
+.tbl__empty { text-align: center; color: var(--text-3); padding: 40px 16px !important; }
+
+/* Filter bar */
+.filterbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.filterbar .input, .filterbar .select { width: auto; min-width: 160px; height: 38px; }
+.filterbar .search { flex: 1; min-width: 200px; }
+
+/* ---------- Toggle switch ---------- */
+.switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.switch__track {
+  position: absolute; inset: 0; border-radius: 999px;
+  background: var(--surface-3); border: 1px solid var(--border-strong);
+  cursor: pointer; transition: background .2s var(--ease);
+}
+.switch__track::before {
+  content: ""; position: absolute; left: 2px; top: 50%; transform: translateY(-50%);
+  width: 18px; height: 18px; border-radius: 50%;
+  background: var(--surface); box-shadow: var(--shadow-1);
+  transition: transform .2s var(--ease), left .2s var(--ease);
+}
+.switch input:checked + .switch__track { background: var(--primary); border-color: var(--primary); }
+.switch input:checked + .switch__track::before { left: 22px; }
+
+/* ---------- Toast ---------- */
+.toasts { position: fixed; right: 20px; bottom: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 1000; max-width: 360px; }
+.toast {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: var(--radius-m); padding: 13px 15px;
+  box-shadow: var(--shadow-3);
+  animation: slide-in .25s var(--ease);
+}
+@keyframes slide-in { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: none; } }
+.toast--out { animation: slide-out .2s var(--ease) forwards; }
+@keyframes slide-out { to { opacity: 0; transform: translateX(20px); } }
+.toast__icon { width: 22px; height: 22px; flex-shrink: 0; margin-top: 1px; }
+.toast__icon .hgi { width: 20px; height: 20px; }
+.toast__body { flex: 1; }
+.toast__title { font-weight: 600; font-size: 13.5px; }
+.toast__msg { font-size: 12.5px; color: var(--text-2); margin-top: 2px; }
+.toast__close { background: none; border: none; color: var(--text-3); cursor: pointer; padding: 2px; }
+.toast__close .hgi { width: 16px; height: 16px; }
+.toast--ok .toast__icon { color: var(--text); }
+.toast--err .toast__icon { color: var(--danger); }
+
+/* ---------- Profile cards ---------- */
+.profile-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-l);
+  padding: 18px;
+  box-shadow: var(--shadow-1);
+  display: flex; flex-direction: column; gap: 10px;
+  position: relative;
+  transition: border-color .15s var(--ease), box-shadow .15s var(--ease);
+}
+.profile-card[data-active="true"] { border-color: var(--primary); box-shadow: var(--shadow-2); }
+.profile-card__top { display: flex; align-items: center; gap: 12px; }
+.profile-card__avatar {
+  width: 44px; height: 44px; border-radius: 14px;
+  background: var(--surface-2); display: grid; place-items: center;
+  color: var(--text-2); font-weight: 600; font-size: 16px;
+}
+.profile-card__name { font-weight: 600; font-size: 15px; }
+.profile-card__meta { font-size: 12px; color: var(--text-3); display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+.profile-card__meta .mono { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 11.5px; }
+.profile-card__actions { display: flex; gap: 8px; margin-top: auto; }
+.profile-card .active-ribbon {
+  position: absolute; top: -1px; right: 18px;
+  padding: 3px 10px; border-radius: 0 0 8px 8px;
+  background: var(--primary); color: var(--on-primary);
+  font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+}
+
+/* ---------- Progress ---------- */
+.progress { height: 8px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+.progress__bar { height: 100%; border-radius: 999px; background: var(--primary); transition: width .3s var(--ease); }
+
+/* ---------- List ---------- */
+.list { display: flex; flex-direction: column; }
+.list__item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px; border-bottom: 1px solid var(--border);
+}
+.list__item:last-child { border-bottom: none; }
+.list__item:hover { background: var(--surface-2); }
+.list__item .hgi { width: 20px; height: 20px; color: var(--text-3); }
+.list__item__main { flex: 1; min-width: 0; }
+.list__item__title { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list__item__sub { font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.list__item__actions { display: flex; gap: 6px; }
+
+/* ---------- Modal ---------- */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,.5);
+  display: grid; place-items: center; z-index: 900;
+  animation: fade .18s var(--ease);
+}
+.modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-l); box-shadow: var(--shadow-3);
+  width: min(520px, calc(100vw - 32px)); max-height: calc(100vh - 48px);
+  overflow-y: auto; padding: 22px;
+  animation: modal-in .2s var(--ease);
+}
+@keyframes modal-in { from { opacity: 0; transform: scale(.97) translateY(8px); } to { opacity: 1; transform: none; } }
+.modal__head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.modal__title { font-size: 17px; font-weight: 600; }
+
+/* ---------- Config modal / settings ---------- */
+.settings-grid { display: grid; gap: 14px; }
+.kv { display: flex; flex-direction: column; gap: 4px; }
+
+/* ---------- Empty state ---------- */
+.empty { text-align: center; padding: 48px 16px; color: var(--text-3); }
+.empty .hgi { width: 44px; height: 44px; margin-bottom: 12px; color: var(--border-strong); }
+.empty__title { font-weight: 600; color: var(--text-2); font-size: 15px; }
+.empty__desc { font-size: 13px; margin-top: 4px; }
+
+/* ---------- Responsive ---------- */
+.mobile-burger { display: none; }
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; grid-template-rows: 60px 1fr; grid-template-areas: "topbar" "main"; }
+  .rail {
+    position: fixed; left: 0; top: 0; bottom: 0; width: 280px; z-index: 800;
+    transform: translateX(-100%); transition: transform .25s var(--ease);
+    box-shadow: var(--shadow-3);
+  }
+  .rail[data-open="true"] { transform: translateX(0); }
+  .rail-backdrop { display: none; }
+  .rail[data-open="true"] ~ .rail-backdrop { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 790; }
+  .mobile-burger { display: inline-grid; }
+  .main { padding: 16px; }
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+
+  <!-- ===================== SIDEBAR ===================== -->
+  <aside class="rail" id="rail" data-open="false">
+    <div class="brand">
+      <div class="brand__mark"><span class="hgi hgi-stroke hgi-message-02"></span></div>
+      <div>
+        <div class="brand__name">WA Engine</div>
+        <div class="brand__sub">Multi-akun control center</div>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav">
+      <div class="nav__group">Utama</div>
+      <button class="nav__item" data-view="dashboard" aria-current="true">
+        <span class="hgi hgi-stroke hgi-dashboard-square-02"></span> Dashboard
+      </button>
+      <button class="nav__item" data-view="send">
+        <span class="hgi hgi-stroke hgi-sent"></span> Kirim Pesan
+      </button>
+      <button class="nav__item" data-view="contacts">
+        <span class="hgi hgi-stroke hgi-user-multiple"></span> Kontak
+      </button>
+      <button class="nav__item" data-view="templates">
+        <span class="hgi hgi-stroke hgi-document-code"></span> Template
+      </button>
+      <button class="nav__item" data-view="schedule">
+        <span class="hgi hgi-stroke hgi-calendar-03"></span> Jadwal
+      </button>
+      <button class="nav__item" data-view="logs">
+        <span class="hgi hgi-stroke hgi-list-setting"></span> Log
+      </button>
+    </nav>
+
+    <div class="rail__foot">
+      <div class="conn" id="conn" data-state="idle">
+        <span class="conn__dot"></span><span id="connText">Menghubungkan…</span>
+      </div>
+      <button class="btn" id="btnSettings" style="width:100%">
+        <span class="hgi hgi-stroke hgi-settings-02"></span> Konfigurasi
+      </button>
+    </div>
+  </aside>
+  <div class="rail-backdrop" id="railBackdrop"></div>
+
+  <!-- ===================== TOPBAR ===================== -->
+  <header class="topbar">
+    <button class="icon-btn mobile-burger" id="btnBurger" aria-label="Menu">
+      <span class="hgi hgi-stroke hgi-menu-01"></span>
+    </button>
+    <div>
+      <div class="topbar__title" id="topbarTitle">Dashboard</div>
+      <div class="topbar__crumb" id="topbarCrumb">WA Engine / Dashboard</div>
+    </div>
+    <div class="topbar__spacer"></div>
+    <div class="chip chip--active" id="activeProfileChip" style="display:none">
+      <span class="hgi hgi-stroke hgi-user"></span><span id="activeProfileChipText"></span>
+    </div>
+    <button class="icon-btn" id="btnTheme" aria-label="Ganti tema" title="Ganti tema terang/gelap">
+      <span class="hgi hgi-stroke hgi-moon-02" id="themeIcon"></span>
+    </button>
+  </header>
+
+  <!-- ===================== MAIN ===================== -->
+  <main class="main" id="main">
+
+    <!-- ============ VIEW: DASHBOARD ============ -->
+    <section class="view" data-view="dashboard" data-active="true">
+      <div class="view__head">
+        <div>
+          <h1 class="view__title">Dashboard</h1>
+          <div class="view__desc">Ringkasan status sistem &amp; profil aktif.</div>
+        </div>
+        <div class="view__actions">
+          <button class="btn" id="btnRefreshDash"><span class="hgi hgi-stroke hgi-refresh"></span> Muat ulang</button>
+        </div>
+      </div>
+
+      <div class="grid grid--stats" id="dashStats"></div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card__title"><span class="hgi hgi-stroke hgi-user-multiple"></span> Profil &amp; Switch</div>
+        <div class="card__sub">Pilih profil untuk dijadikan akun aktif pada perangkat.</div>
+        <div class="card__body grid grid--2" id="profileGrid"></div>
+      </div>
+
+      <div class="card" style="margin-top:16px">
+        <div class="card__title"><span class="hgi hgi-stroke hgi-information-circle"></span> Informasi Sistem</div>
+        <div class="card__body" id="sysInfo"></div>
+      </div>
+    </section>
+
+    <!-- ============ VIEW: SEND ============ -->
+    <section class="view" data-view="send">
+      <div class="view__head">
+        <div>
+          <h1 class="view__title">Kirim Pesan</h1>
+          <div class="view__desc">Kirim pesan tunggal atau blast ke banyak nomor sekaligus.</div>
+        </div>
+      </div>
+
+      <div class="grid grid--2">
+        <div class="card">
+          <div class="card__title"><span class="hgi hgi-stroke hgi-sent"></span> Kirim Tunggal</div>
+          <div class="card__sub">Kirim satu pesan ke satu nomor.</div>
+          <div class="card__body">
+            <div class="field">
+              <label class="field__label">Profil pengirim</label>
+              <select class="select" id="sendProfile"></select>
+            </div>
+            <div class="field">
+              <label class="field__label">Nomor tujuan</label>
+              <input class="input" id="sendNumber" placeholder="+6281234567890" inputmode="tel">
+              <div class="field__hint">Format internasional dengan kode negara.</div>
+            </div>
+            <div class="field">
+              <label class="field__label">Pesan</label>
+              <textarea class="textarea" id="sendMessage" placeholder="Tulis pesan…"></textarea>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn--primary" id="btnSendSingle">
+                <span class="hgi hgi-stroke hgi-send-01"></span> Kirim
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card__title"><span class="hgi hgi-stroke hgi-sharing"></span> Blast (Massal)</div>
+          <div class="card__sub">Kirim pesan yang sama ke banyak nomor (antrian + retry otomatis).</div>
+          <div class="card__body">
+            <div class="field">
+              <label class="field__label">Profil pengirim</label>
+              <select class="select" id="blastProfile"></select>
+            </div>
+            <div class="field">
+              <label class="field__label">Daftar nomor</label>
+              <textarea class="textarea" id="blastTargets" placeholder="+6281234567890&#10;+6281234567891&#10;+6281234567892"></textarea>
+              <div class="field__hint">Satu nomor per baris.</div>
+            </div>
+            <div class="field">
+              <label class="field__label">Pesan</label>
+              <textarea class="textarea" id="blastMessage" placeholder="Tulis pesan blast…"></textarea>
+            </div>
+            <div class="form-actions">
+              <button class="btn btn--primary" id="btnSendBlast">
+                <span class="hgi hgi-stroke hgi-send-01"></span> Mulai Blast
+              </button>
+            </div>
+            <div id="blastProgress" style="display:none; margin-top:16px">
+              <div class="field__label" id="blastProgressLabel">0 / 0</div>
+              <div class="progress"><div class="progress__bar" id="blastProgressBar" style="width:0%"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ VIEW: CONTACTS ============ -->
+    <section class="view" data-view="contacts">
+      <div class="view__head">
+        <div>
+          <h1 class="view__title">Kontak</h1>
+          <div class="view__desc">Kelola daftar kontak untuk pengiriman massal.</div>
+        </div>
+        <div class="view__actions">
+          <button class="btn" id="btnImportContacts"><span class="hgi hgi-stroke hgi-upload-01"></span> Import CSV</button>
+          <input type="file" id="contactFileInput" accept=".csv,.txt" style="display:none">
+          <button class="btn btn--primary" id="btnAddContact"><span class="hgi hgi-stroke hgi-plus-sign"></span> Tambah</button>
+        </div>
+      </div>
+
+      <div class="filterbar">
+        <input class="input search" id="contactSearch" placeholder="Cari nama / nomor…">
+        <select class="select" id="contactGroupFilter"><option value="">Semua grup</option></select>
+        <span class="chip" id="contactCount"></span>
+      </div>
+
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead>
+            <tr><th>Nama</th><th>Nomor</th><th>Grup</th><th>Dibuat</th><th style="text-align:right">Aksi</th></tr>
+          </thead>
+          <tbody id="contactTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ VIEW: TEMPLATES ============ -->
+    <section class="view" data-view="templates">
+      <div class="view__head">
+        <div>
+          <h1 class="view__title">Template</h1>
+          <div class="view__desc">Template pesan dengan variabel placeholder yang dapat digunakan ulang.</div>
+        </div>
+        <div class="view__actions">
+          <button class="btn btn--primary" id="btnAddTemplate"><span class="hgi hgi-stroke hgi-plus-sign"></span> Template Baru</button>
+        </div>
+      </div>
+      <div class="grid grid--2" id="templateGrid"></div>
+    </section>
+
+    <!-- ============ VIEW: SCHEDULE ============ -->
+    <section class="view" data-view="schedule">
+      <div class="view__head">
+        <div>
+          <h1 class="view__title">Jadwal</h1>
+          <div class="view__desc">Jadwalkan pengiriman pesan pada waktu tertentu.</div>
+        </div>
+        <div class="view__actions">
+          <button class="btn btn--primary" id="btnAddSchedule"><span class="hgi hgi-stroke hgi-plus-sign"></span> Jadwal Baru</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead>
+            <tr><th>Nama</th><th>Profil</th><th>Target</th><th>Jadwal</th><th>Status</th><th style="text-align:right">Aksi</th></tr>
+          </thead>
+          <tbody id="scheduleTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ VIEW: LOGS ============ -->
+    <section class="view" data-view="logs">
+      <div class="view__head">
+        <div>
+          <h1 class="view__title">Log</h1>
+          <div class="view__desc" id="logsDesc">Aliran log pengiriman (real-time via SSE).</div>
+        </div>
+        <div class="view__actions">
+          <span class="chip" id="logModeChip" title="Sumber data">
+            <span class="hgi hgi-stroke hgi-wifi"></span><span id="logModeText">Menyambung…</span>
+          </span>
+          <button class="btn" id="btnClearLogs"><span class="hgi hgi-stroke hgi-delete-01"></span> Hapus log lama</button>
+        </div>
+      </div>
+
+      <div class="filterbar">
+        <input class="input search" id="logSearch" placeholder="Cari nomor / pesan…">
+        <select class="select" id="logStatusFilter">
+          <option value="">Semua status</option>
+          <option value="SUCCESS">SUCCESS</option>
+          <option value="FAILED">FAILED</option>
+          <option value="RETRY">RETRY</option>
+          <option value="PENDING">PENDING</option>
+          <option value="SENDING">SENDING</option>
+        </select>
+        <select class="select" id="logProfileFilter"><option value="">Semua profil</option></select>
+        <input class="input" type="date" id="logDateFilter" title="Filter tanggal">
+      </div>
+
+      <div class="table-wrap">
+        <table class="tbl">
+          <thead>
+            <tr><th>Waktu</th><th>Profil</th><th>Target</th><th>Pesan</th><th>Status</th><th>Percobaan</th><th>Durasi</th><th>Error</th></tr>
+          </thead>
+          <tbody id="logTbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ===================== TOASTS ===================== -->
+<div class="toasts" id="toasts"></div>
+
+<!-- ===================== MODALS (container) ===================== -->
+<div id="modalRoot"></div>
+
+<script>
+"use strict";
+/* =========================================================================
+   WA Engine — frontend logic (vanilla JS, no framework)
+   - API base + key dari konfigurasi (localStorage)
+   - SSE ke /api/events dengan fallback polling 5s
+   - Semua fetch memakai header X-API-Key
+   ========================================================================= */
+
+/* ------------------------------- Helpers ------------------------------- */
+const $  = (sel, root) => (root || document).querySelector(sel);
+const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+
+// Ikon Hugeicons — helper untuk membuat elemen <span> ikon konsisten.
+function hgi(name, opts) {
+  const s = document.createElement("span");
+  s.className = "hgi hgi-stroke " + name;
+  if (opts && opts.size) { s.style.width = opts.size; s.style.height = opts.size; }
+  return s;
+}
+
+function esc(s) {
+  return String(s == null ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
+function fmtTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+function fmtDur(ms) {
+  if (ms == null) return "—";
+  if (ms < 1000) return ms + " ms";
+  return (ms / 1000).toFixed(1) + " s";
+}
+
+function statusBadge(status) {
+  const map = {
+    SUCCESS: "badge--success",
+    FAILED:  "badge--failed",
+    RETRY:   "badge--retry",
+    PENDING: "badge--pending",
+    SENDING: "badge--pending",
+  };
+  const cls = map[status] || "";
+  return `<span class="badge ${cls}">${esc(status || "UNKNOWN")}</span>`;
+}
+
+/* ------------------------------- Storage ------------------------------- */
+const LS = {
+  get(key, fallback) {
+    try { const v = localStorage.getItem(key); return v == null ? fallback : JSON.parse(v); }
+    catch { return fallback; }
+  },
+  set(key, val) { localStorage.setItem(key, JSON.stringify(val)); },
+  del(key) { localStorage.removeItem(key); },
+};
+
+/* ------------------------------- Config ------------------------------- */
+const Config = {
+  get() {
+    return Object.assign({
+      baseUrl: "http://localhost:8080",
+      apiKey: "",
+      theme: "light",
+    }, LS.get("wa.config", {}));
+  },
+  save(cfg) {
+    LS.set("wa.config", cfg);
+    applyTheme(cfg.theme);
+  },
+};
+
+function apiUrl(path) {
+  return Config.get().baseUrl.replace(/\/+$/, "") + path;
+}
+
+/* ------------------------------- Theme ------------------------------- */
+function applyTheme(theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  const icon = $("#themeIcon");
+  if (icon) {
+    icon.className = "hgi hgi-stroke " + (theme === "dark" ? "hgi-sun-02" : "hgi-moon-02");
+  }
+}
+
+/* ------------------------------- Toast ------------------------------- */
+function toast(title, msg, kind) {
+  const t = document.createElement("div");
+  t.className = "toast toast--" + (kind || "ok");
+  const iconName = kind === "err" ? "hgi-alert-02" : "hgi-checkmark-circle-02";
+  t.innerHTML = `
+    <div class="toast__icon"><span class="hgi hgi-stroke ${iconName}"></span></div>
+    <div class="toast__body">
+      <div class="toast__title">${esc(title)}</div>
+      ${msg ? `<div class="toast__msg">${esc(msg)}</div>` : ""}
+    </div>
+    <button class="toast__close" aria-label="Tutup"><span class="hgi hgi-stroke hgi-cancel-01"></span></button>`;
+  $("#toasts").appendChild(t);
+  const kill = () => { t.classList.add("toast--out"); setTimeout(() => t.remove(), 200); };
+  t.querySelector(".toast__close").addEventListener("click", kill);
+  setTimeout(kill, 4000);
+}
+
+/* ------------------------------- API client ------------------------------- */
+async function apiFetch(path, opts) {
+  opts = opts || {};
+  const cfg = Config.get();
+  const headers = Object.assign({
+    "Content-Type": "application/json",
+    "X-API-Key": cfg.apiKey || "",
+  }, opts.headers || {});
+  const res = await fetch(apiUrl(path), Object.assign({}, opts, { headers }));
+  let data = null;
+  const text = await res.text();
+  if (text) { try { data = JSON.parse(text); } catch { data = text; } }
+  if (!res.ok) {
+    const msg = (data && (data.error || data.message)) || `HTTP ${res.status}`;
+    const err = new Error(msg);
+    err.status = res.status;
+    err.data = data;
+    throw err;
+  }
+  return data;
+}
+
+/* ------------------------------- Navigation ------------------------------- */
+const VIEW_META = {
+  dashboard: ["Dashboard", "WA Engine / Dashboard"],
+  send:      ["Kirim Pesan", "WA Engine / Kirim Pesan"],
+  contacts:  ["Kontak", "WA Engine / Kontak"],
+  templates: ["Template", "WA Engine / Template"],
+  schedule:  ["Jadwal", "WA Engine / Jadwal"],
+  logs:      ["Log", "WA Engine / Log"],
+};
+
+function navigate(view) {
+  $$(".view").forEach(v => v.setAttribute("data-active", v.dataset.view === view ? "true" : "false"));
+  $$(".nav__item").forEach(b => b.setAttribute("aria-current", b.dataset.view === view ? "true" : "false"));
+  $("#topbarTitle").textContent = VIEW_META[view][0];
+  $("#topbarCrumb").textContent = VIEW_META[view][1];
+  $("#main").scrollTop = 0;
+  closeRail();
+  LS.set("wa.activeView", view);
+}
+
+function closeRail() { $("#rail").setAttribute("data-open", "false"); }
+
+/* ------------------------------- Connection indicator ------------------------------- */
+function setConn(state, label) {
+  const el = $("#conn");
+  el.setAttribute("data-state", state);
+  $("#connText").textContent = label;
+}
+
+/* ------------------------------- Data cache ------------------------------- */
+const store = {
+  profiles: [],     // [{name, android_user, status, spoof, created_at}]
+  activeProfile: "",
+  blastRunning: false,
+};
+
+/* ============================== API LOADERS ============================== */
+
+async function loadHealth() {
+  try {
+    const res = await fetch(apiUrl("/api/health"));
+    if (!res.ok) throw new Error("health " + res.status);
+    const data = await res.json();
+    setConn("ok", "Terhubung · " + (data.backend || "backend"));
+    return data;
+  } catch (e) {
+    setConn("err", "Tidak terhubung");
+    return null;
+  }
+}
+
+async function loadStatus() {
+  const d = await apiFetch("/api/status");
+  store.activeProfile = d.active_profile || "";
+  store.blastRunning = !!d.blast_running;
+  return d;
+}
+
+async function loadProfiles() {
+  const d = await apiFetch("/api/profiles");
+  store.profiles = d.profiles || [];
+  return store.profiles;
+}
+
+async function switchProfile(name) {
+  const d = await apiFetch("/api/profiles/switch", {
+    method: "POST",
+    body: JSON.stringify({ profile: name }),
+  });
+  return d;
+}
+
+/* ============================== DASHBOARD ============================== */
+function renderStats(health) {
+  const stats = [
+    { label: "Profil", value: store.profiles.length, icon: "hgi-user-multiple", hint: "akun terdaftar" },
+    { label: "Profil Aktif", value: store.activeProfile || "—", icon: "hgi-user", hint: store.blastRunning ? "blast sedang berjalan" : "siap" },
+    { label: "Backend", value: health ? "Online" : "Offline", icon: "hgi-server", hint: health ? (health.backend || "") : "periksa koneksi" },
+    { label: "Blast", value: store.blastRunning ? "Berjalan" : "Idle", icon: "hgi-sharing", hint: store.blastRunning ? "terkunci" : "tidak aktif" },
+  ];
+  $("#dashStats").innerHTML = stats.map(s => `
+    <div class="stat">
+      <div class="stat__icon"><span class="hgi hgi-stroke ${s.icon}"></span></div>
+      <div class="stat__label">${s.label}</div>
+      <div class="stat__value">${esc(s.value)}</div>
+      <div class="stat__hint">${esc(s.hint)}</div>
+    </div>`).join("");
+}
+
+function renderProfileGrid() {
+  const grid = $("#profileGrid");
+  if (!store.profiles.length) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
+      <span class="hgi hgi-stroke hgi-user-multiple"></span>
+      <div class="empty__title">Belum ada profil</div>
+      <div class="empty__desc">Profil muncul setelah backend dimuat dari config.json.</div>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = store.profiles.map(p => {
+    const active = p.name === store.activeProfile;
+    const spoof = p.spoof || {};
+    return `
+    <div class="profile-card" data-active="${active ? "true" : "false"}">
+      ${active ? `<div class="active-ribbon">Aktif</div>` : ""}
+      <div class="profile-card__top">
+        <div class="profile-card__avatar">${esc((p.name || "?").slice(-2).toUpperCase())}</div>
+        <div>
+          <div class="profile-card__name">${esc(p.name)}</div>
+          <div class="profile-card__meta" style="margin-top:0">android_user ${esc(p.android_user)} · ${esc(p.status || "—")}</div>
+        </div>
+      </div>
+      <div class="profile-card__meta">
+        <div>IMEI <span class="mono">${esc(spoof.imei || "—")}</span></div>
+        <div>Android ID <span class="mono">${esc(spoof.android_id || "—")}</span></div>
+        <div>Model <span class="mono">${esc(spoof.device_model || "—")}</span></div>
+      </div>
+      <div class="profile-card__actions">
+        <button class="btn btn--sm ${active ? "" : "btn--primary"}" data-switch="${esc(p.name)}" ${active ? "disabled" : ""}>
+          <span class="hgi hgi-stroke hgi-swap-horizontal"></span> ${active ? "Aktif" : "Switch ke profil"}
+        </button>
+      </div>
+    </div>`;
+  }).join("");
+
+  $$("[data-switch]", grid).forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const name = btn.dataset.switch;
+      btn.disabled = true;
+      try {
+        await switchProfile(name);
+        toast("Profil berpindah", `Profil aktif: ${name}`);
+        await refreshDashboard();
+      } catch (e) {
+        toast("Gagal switch", e.message, "err");
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
+function renderSysInfo(health) {
+  const el = $("#sysInfo");
+  const rows = [
+    ["Backend", health ? (health.backend || "—") : "offline"],
+    ["Waktu server", health ? fmtTime(health.time) : "—"],
+    ["Jumlah profil (health)", health ? String(health.profiles) : "—"],
+    ["Profil aktif", store.activeProfile || "—"],
+    ["Mode realtime", logSource === "sse" ? "SSE (/api/events)" : "Polling (5 detik)"],
+  ];
+  el.innerHTML = rows.map(([k, v]) => `
+    <div class="list__item" style="padding:10px 2px">
+      <div class="list__item__main">
+        <div class="list__item__title" style="font-weight:400">${esc(k)}</div>
+      </div>
+      <div class="muted mono">${esc(v)}</div>
+    </div>`).join("");
+}
+
+async function refreshDashboard() {
+  const health = await loadHealth();
+  try {
+    await loadStatus();
+    await loadProfiles();
+  } catch (e) {
+    // API key mungkin belum diset — biarkan grid kosong dengan hint.
+  }
+  renderStats(health);
+  renderProfileGrid();
+  renderSysInfo(health);
+  updateProfileChip();
+  populateProfileSelects();
+  populateLogProfileFilter();
+}
+
+function updateProfileChip() {
+  const chip = $("#activeProfileChip");
+  if (store.activeProfile) {
+    chip.style.display = "";
+    $("#activeProfileChipText").textContent = store.activeProfile;
+  } else {
+    chip.style.display = "none";
+  }
+}
+
+function populateProfileSelects() {
+  const names = store.profiles.map(p => p.name);
+  const opts = names.map(n => `<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  ["#sendProfile", "#blastProfile"].forEach(sel => {
+    const el = $(sel);
+    el.innerHTML = opts || `<option value="">— tidak ada profil —</option>`;
+  });
+}
+
+/* ============================== SEND ============================== */
+async function handleSendSingle() {
+  const number = $("#sendNumber").value.trim();
+  const message = $("#sendMessage").value.trim();
+  const profile = $("#sendProfile").value;
+  if (!number || !message) { toast("Data belum lengkap", "Nomor dan pesan wajib diisi.", "err"); return; }
+  const btn = $("#btnSendSingle");
+  btn.disabled = true;
+  try {
+    const d = await apiFetch("/api/message/send", {
+      method: "POST",
+      body: JSON.stringify({ number, message, profile }),
+    });
+    toast("Terkirim", `Status: ${d.status} · ${fmtDur(d.duration_ms)}`, d.status === "SUCCESS" ? "ok" : "err");
+    $("#sendMessage").value = "";
+  } catch (e) {
+    toast("Gagal mengirim", e.message, "err");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+let blastJobId = null;
+let blastPollTimer = null;
+
+function startBlastProgress(jobId, total) {
+  blastJobId = jobId;
+  const wrap = $("#blastProgress");
+  wrap.style.display = "";
+  $("#blastProgressLabel").textContent = `0 / ${total}`;
+  $("#blastProgressBar").style.width = "0%";
+  clearInterval(blastPollTimer);
+  blastPollTimer = setInterval(async () => {
+    try {
+      const d = await apiFetch(`/api/blast/${blastJobId}/status`);
+      const done = d.done || 0;
+      const total = d.total || 1;
+      $("#blastProgressLabel").textContent = `${done} / ${total} · sukses ${d.succeeded} · gagal ${d.failed}`;
+      $("#blastProgressBar").style.width = `${Math.round((done / total) * 100)}%`;
+      if (d.status === "finished") {
+        clearInterval(blastPollTimer);
+        blastPollTimer = null;
+        toast("Blast selesai", `${d.succeeded} sukses, ${d.failed} gagal`, d.failed ? "err" : "ok");
+      }
+    } catch (e) { /* job mungkin sudah hilang; stop polling */ }
+  }, 2000);
+}
+
+async function handleSendBlast() {
+  const targets = $("#blastTargets").value.split("\n").map(s => s.trim()).filter(Boolean);
+  const message = $("#blastMessage").value.trim();
+  const profile = $("#blastProfile").value;
+  if (!targets.length || !message) { toast("Data belum lengkap", "Isi daftar nomor dan pesan.", "err"); return; }
+  const btn = $("#btnSendBlast");
+  btn.disabled = true;
+  try {
+    const d = await apiFetch("/api/message/blast", {
+      method: "POST",
+      body: JSON.stringify({ targets, message, profile }),
+    });
+    toast("Blast dimulai", `Job ${d.job_id} · ${d.total} target`);
+    startBlastProgress(d.job_id, d.total);
+    $("#blastTargets").value = "";
+    $("#blastMessage").value = "";
+  } catch (e) {
+    if (e.status === 409) toast("Blast berjalan", "Ada blast lain yang sedang berjalan.", "err");
+    else toast("Gagal memulai blast", e.message, "err");
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ============================== CONTACTS ============================== */
+// Kontak disimpan lokal (backend belum mengekspos endpoint contacts; UI siap
+// di-hook ke endpoint masa depan dengan mengganti fungsi get/set di bawah).
+function getContacts() { return LS.get("wa.contacts", []); }
+function setContacts(list) { LS.set("wa.contacts", list); }
+
+function renderContacts() {
+  const q = $("#contactSearch").value.toLowerCase();
+  const grp = $("#contactGroupFilter").value;
+  const list = getContacts().filter(c => {
+    const matchQ = !q || (c.name + " " + c.phone).toLowerCase().includes(q);
+    const matchG = !grp || (c.grp || "") === grp;
+    return matchQ && matchG;
+  });
+  const tbody = $("#contactTbody");
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td class="tbl__empty" colspan="5">Belum ada kontak. Tambahkan atau import CSV.</td></tr>`;
+  } else {
+    tbody.innerHTML = list.map(c => `
+      <tr>
+        <td>${esc(c.name || "—")}</td>
+        <td class="mono">${esc(c.phone)}</td>
+        <td>${esc(c.grp || "—")}</td>
+        <td class="muted">${esc(fmtTime(c.created_at))}</td>
+        <td style="text-align:right">
+          <button class="btn btn--sm btn--ghost" data-contact-del="${esc(c.id)}" title="Hapus">
+            <span class="hgi hgi-stroke hgi-delete-02"></span>
+          </button>
+        </td>
+      </tr>`).join("");
+  }
+  $("#contactCount").textContent = `${list.length} kontak`;
+
+  // Group filter options
+  const groups = Array.from(new Set(getContacts().map(c => c.grp).filter(Boolean)));
+  const cur = $("#contactGroupFilter").value;
+  $("#contactGroupFilter").innerHTML =
+    `<option value="">Semua grup</option>` + groups.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join("");
+  $("#contactGroupFilter").value = cur;
+
+  $$("[data-contact-del]").forEach(b => b.addEventListener("click", () => {
+    const id = b.dataset.contactDel;
+    setContacts(getContacts().filter(c => c.id !== id));
+    renderContacts();
+    toast("Kontak dihapus", "");
+  }));
+}
+
+function openContactModal(contact) {
+  const isEdit = !!contact;
+  openModal(`
+    <div class="modal__head">
+      <div class="modal__title">${isEdit ? "Edit Kontak" : "Tambah Kontak"}</div>
+      <button class="icon-btn" data-modal-close aria-label="Tutup"><span class="hgi hgi-stroke hgi-cancel-01"></span></button>
+    </div>
+    <div class="field">
+      <label class="field__label">Nama</label>
+      <input class="input" id="fName" value="${esc(contact ? contact.name : "")}" placeholder="Nama kontak">
+    </div>
+    <div class="field">
+      <label class="field__label">Nomor</label>
+      <input class="input" id="fPhone" value="${esc(contact ? contact.phone : "")}" placeholder="+628..." inputmode="tel">
+    </div>
+    <div class="field">
+      <label class="field__label">Grup</label>
+      <input class="input" id="fGrp" value="${esc(contact ? contact.grp : "")}" placeholder="opsional">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn--primary" id="fSave"><span class="hgi hgi-stroke hgi-checkmark"></span> Simpan</button>
+    </div>`);
+  $("#fSave").addEventListener("click", () => {
+    const name = $("#fName").value.trim();
+    const phone = $("#fPhone").value.trim();
+    const grp = $("#fGrp").value.trim();
+    if (!name || !phone) { toast("Data belum lengkap", "Nama dan nomor wajib.", "err"); return; }
+    const list = getContacts();
+    if (isEdit) {
+      const i = list.findIndex(c => c.id === contact.id);
+      list[i] = Object.assign({}, list[i], { name, phone, grp });
+    } else {
+      list.push({ id: "c" + Date.now(), name, phone, grp, created_at: new Date().toISOString() });
+    }
+    setContacts(list);
+    closeModal();
+    renderContacts();
+    toast("Kontak tersimpan", name);
+  });
+}
+
+function handleContactImport(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    const text = reader.result;
+    const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const list = getContacts();
+    let added = 0;
+    lines.forEach(line => {
+      // Support "name,phone[,grp]" or just "phone"
+      const parts = line.split(/[,;\t]/).map(s => s.trim());
+      let name, phone, grp = "";
+      if (parts.length === 1) { name = parts[0]; phone = parts[0]; }
+      else { name = parts[0]; phone = parts[1]; grp = parts[2] || ""; }
+      if (!phone) return;
+      list.push({ id: "c" + Date.now() + Math.random(), name, phone, grp, created_at: new Date().toISOString() });
+      added++;
+    });
+    setContacts(list);
+    renderContacts();
+    toast("Import selesai", `${added} kontak ditambahkan.`);
+  };
+  reader.readAsText(file);
+}
+
+/* ============================== TEMPLATES ============================== */
+function getTemplates() { return LS.get("wa.templates", []); }
+function setTemplates(list) { LS.set("wa.templates", list); }
+
+function renderTemplates() {
+  const grid = $("#templateGrid");
+  const list = getTemplates();
+  if (!list.length) {
+    grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
+      <span class="hgi hgi-stroke hgi-document-code"></span>
+      <div class="empty__title">Belum ada template</div>
+      <div class="empty__desc">Buat template pesan agar mudah digunakan ulang.</div>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = list.map(t => `
+    <div class="card" style="margin:0">
+      <div class="card__title"><span class="hgi hgi-stroke hgi-document-code"></span> ${esc(t.name)}</div>
+      <div class="card__body">
+        <div class="mono muted" style="white-space:pre-wrap; line-height:1.6">${esc(t.body)}</div>
+        <div class="muted" style="font-size:11.5px; margin-top:10px">Dibuat ${esc(fmtTime(t.created_at))}</div>
+        <div class="form-actions" style="justify-content:flex-start; margin-top:12px">
+          <button class="btn btn--sm" data-tpl-use="${esc(t.id)}"><span class="hgi hgi-stroke hgi-sent"></span> Pakai</button>
+          <button class="btn btn--sm btn--ghost" data-tpl-del="${esc(t.id)}"><span class="hgi hgi-stroke hgi-delete-02"></span></button>
+        </div>
+      </div>
+    </div>`).join("");
+
+  $$("[data-tpl-use]").forEach(b => b.addEventListener("click", () => {
+    const t = getTemplates().find(x => x.id === b.dataset.tplUse);
+    if (t) { navigate("send"); $("#sendMessage").value = t.body; toast("Template dimuat", t.name); }
+  }));
+  $$("[data-tpl-del]").forEach(b => b.addEventListener("click", () => {
+    setTemplates(getTemplates().filter(x => x.id !== b.dataset.tplDel));
+    renderTemplates();
+    toast("Template dihapus", "");
+  }));
+}
+
+function openTemplateModal(tpl) {
+  const isEdit = !!tpl;
+  openModal(`
+    <div class="modal__head">
+      <div class="modal__title">${isEdit ? "Edit Template" : "Template Baru"}</div>
+      <button class="icon-btn" data-modal-close aria-label="Tutup"><span class="hgi hgi-stroke hgi-cancel-01"></span></button>
+    </div>
+    <div class="field">
+      <label class="field__label">Nama template</label>
+      <input class="input" id="fName" value="${esc(tpl ? tpl.name : "")}" placeholder="e.g. Konfirmasi Pesanan">
+    </div>
+    <div class="field">
+      <label class="field__label">Isi pesan</label>
+      <textarea class="textarea" id="fBody" placeholder="Gunakan {{nama}} untuk variabel…">${esc(tpl ? tpl.body : "")}</textarea>
+      <div class="field__hint">Placeholder variabel pakai format {{nama}}.</div>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn--primary" id="fSave"><span class="hgi hgi-stroke hgi-checkmark"></span> Simpan</button>
+    </div>`);
+  $("#fSave").addEventListener("click", () => {
+    const name = $("#fName").value.trim();
+    const body = $("#fBody").value;
+    if (!name || !body) { toast("Data belum lengkap", "Nama dan isi wajib.", "err"); return; }
+    const list = getTemplates();
+    if (isEdit) {
+      const i = list.findIndex(x => x.id === tpl.id);
+      list[i] = Object.assign({}, list[i], { name, body });
+    } else {
+      list.push({ id: "t" + Date.now(), name, body, created_at: new Date().toISOString() });
+    }
+    setTemplates(list);
+    closeModal();
+    renderTemplates();
+    toast("Template tersimpan", name);
+  });
+}
+
+/* ============================== SCHEDULE ============================== */
+function getSchedules() { return LS.get("wa.schedules", []); }
+function setSchedules(list) { LS.set("wa.schedules", list); }
+
+function renderSchedules() {
+  const tbody = $("#scheduleTbody");
+  const list = getSchedules().sort((a, b) => (a.run_at || "").localeCompare(b.run_at || ""));
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td class="tbl__empty" colspan="6">Belum ada jadwal.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(s => `
+    <tr>
+      <td>${esc(s.name)}</td>
+      <td>${esc(s.profile || "—")}</td>
+      <td class="mono">${esc(s.target || "—")}</td>
+      <td class="muted">${esc(fmtTime(s.run_at))}</td>
+      <td>${statusBadge(s.status || "PENDING")}</td>
+      <td style="text-align:right">
+        <button class="btn btn--sm btn--ghost" data-sched-del="${esc(s.id)}"><span class="hgi hgi-stroke hgi-delete-02"></span></button>
+      </td>
+    </tr>`).join("");
+  $$("[data-sched-del]").forEach(b => b.addEventListener("click", () => {
+    setSchedules(getSchedules().filter(x => x.id !== b.dataset.schedDel));
+    renderSchedules();
+    toast("Jadwal dihapus", "");
+  }));
+}
+
+function openScheduleModal() {
+  const profiles = store.profiles.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("");
+  openModal(`
+    <div class="modal__head">
+      <div class="modal__title">Jadwal Baru</div>
+      <button class="icon-btn" data-modal-close aria-label="Tutup"><span class="hgi hgi-stroke hgi-cancel-01"></span></button>
+    </div>
+    <div class="field">
+      <label class="field__label">Nama jadwal</label>
+      <input class="input" id="fName" placeholder="e.g. Broadcast pagi">
+    </div>
+    <div class="row">
+      <div class="field">
+        <label class="field__label">Profil</label>
+        <select class="select" id="fProfile">${profiles || `<option value="">—</option>`}</select>
+      </div>
+      <div class="field">
+        <label class="field__label">Target</label>
+        <input class="input" id="fTarget" placeholder="nomor / daftar">
+      </div>
+    </div>
+    <div class="field">
+      <label class="field__label">Pesan</label>
+      <textarea class="textarea" id="fMessage" placeholder="Isi pesan…"></textarea>
+    </div>
+    <div class="field">
+      <label class="field__label">Waktu eksekusi</label>
+      <input class="input" id="fRunAt" type="datetime-local">
+    </div>
+    <div class="form-actions">
+      <button class="btn btn--primary" id="fSave"><span class="hgi hgi-stroke hgi-checkmark"></span> Simpan</button>
+    </div>`);
+  $("#fSave").addEventListener("click", () => {
+    const name = $("#fName").value.trim();
+    const runAt = $("#fRunAt").value;
+    if (!name || !runAt) { toast("Data belum lengkap", "Nama dan waktu wajib.", "err"); return; }
+    const list = getSchedules();
+    list.push({
+      id: "s" + Date.now(),
+      name,
+      profile: $("#fProfile").value,
+      target: $("#fTarget").value.trim(),
+      message: $("#fMessage").value,
+      run_at: new Date(runAt).toISOString(),
+      status: "PENDING",
+      created_at: new Date().toISOString(),
+    });
+    setSchedules(list);
+    closeModal();
+    renderSchedules();
+    toast("Jadwal tersimpan", name);
+  });
+}
+
+/* ============================== LOGS ============================== */
+let logBuffer = [];        // array of log objects (newest first)
+const MAX_LOG_ROWS = 500;
+let logSource = "sse";     // "sse" | "poll"
+
+function normalizeLog(l) {
+  return {
+    log_id: l.log_id || l.id || "",
+    timestamp: l.timestamp || l.time || new Date().toISOString(),
+    profile: l.profile || "",
+    target: l.target || l.number || "",
+    message_preview: l.message_preview || l.message || l.msg || "",
+    status: (l.status || "UNKNOWN").toUpperCase(),
+    attempt: l.attempt != null ? l.attempt : (l.attempts != null ? l.attempts : 0),
+    error_code: l.error_code != null ? l.error_code : (l.code != null ? l.code : ""),
+    error_message: l.error_message || l.error || "",
+    duration_ms: l.duration_ms != null ? l.duration_ms : (l.duration != null ? l.duration : null),
+  };
+}
+
+function renderLogs() {
+  const q = $("#logSearch").value.toLowerCase();
+  const statusF = $("#logStatusFilter").value;
+  const profileF = $("#logProfileFilter").value;
+  const dateF = $("#logDateFilter").value;
+
+  const rows = logBuffer.filter(l => {
+    const matchQ = !q || (l.target + " " + l.message_preview + " " + l.profile).toLowerCase().includes(q);
+    const matchS = !statusF || l.status === statusF;
+    const matchP = !profileF || l.profile === profileF;
+    let matchD = true;
+    if (dateF) {
+      matchD = (l.timestamp || "").slice(0, 10) === dateF;
+    }
+    return matchQ && matchS && matchP && matchD;
+  });
+
+  const tbody = $("#logTbody");
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td class="tbl__empty" colspan="8">Belum ada log.</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(l => `
+    <tr>
+      <td class="muted num">${esc(fmtTime(l.timestamp))}</td>
+      <td>${esc(l.profile || "—")}</td>
+      <td class="mono">${esc(l.target || "—")}</td>
+      <td style="max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${esc(l.message_preview)}">${esc(l.message_preview || "—")}</td>
+      <td>${statusBadge(l.status)}</td>
+      <td class="num">${l.attempt}</td>
+      <td class="num muted">${fmtDur(l.duration_ms)}</td>
+      <td class="muted" style="max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap" title="${esc(l.error_message)}">${esc(l.error_message || (l.error_code ? "kode " + l.error_code : "—"))}</td>
+    </tr>`).join("");
+}
+
+function ingestLogs(entries) {
+  if (!Array.isArray(entries)) return;
+  entries.forEach(e => {
+    const n = normalizeLog(e);
+    // dedupe by log_id (or composite)
+    const key = n.log_id || (n.timestamp + n.target + n.status);
+    if (!logBuffer.some(x => (x.log_id || "") === key)) {
+      logBuffer.unshift(n);
+    }
+  });
+  // sort newest first, cap size
+  logBuffer.sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
+  if (logBuffer.length > MAX_LOG_ROWS) logBuffer.length = MAX_LOG_ROWS;
+  renderLogs();
+}
+
+async function fetchLogs() {
+  const params = new URLSearchParams();
+  params.set("limit", "200");
+  const statusF = $("#logStatusFilter").value;
+  const profileF = $("#logProfileFilter").value;
+  const dateF = $("#logDateFilter").value;
+  if (statusF) params.set("status", statusF);
+  if (profileF) params.set("profile", profileF);
+  if (dateF) params.set("date", dateF);
+  const d = await apiFetch("/api/logs?" + params.toString());
+  // Replace buffer with fresh server data when doing full fetch.
+  logBuffer = (d.logs || []).map(normalizeLog).sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
+  renderLogs();
+}
+
+/* ------------------- SSE (EventSource) with polling fallback ------------------- */
+let es = null;
+let pollTimer = null;
+
+function setLogMode(mode) {
+  logSource = mode;
+  $("#logModeText").textContent = mode === "sse" ? "SSE" : "Polling";
+  $("#logModeChip").querySelector(".hgi").className = "hgi hgi-stroke " + (mode === "sse" ? "hgi-wifi" : "hgi-refresh");
+  $("#logsDesc").textContent = mode === "sse"
+    ? "Aliran log pengiriman (real-time via SSE /api/events)."
+    : "SSE tidak tersedia — fallback polling setiap 5 detik.";
+}
+
+function startSSE() {
+  try {
+    const cfg = Config.get();
+    // EventSource tidak mendukung header custom; kirim key via query param,
+    // tetapi backend utama memakai header X-API-Key. Karena itu kami sertakan
+    // key di query untuk endpoint /api/events yang SSE-friendly, dan fallback
+    // ke polling bila gagal.
+    const url = apiUrl("/api/events") + (cfg.apiKey ? "?api_key=" + encodeURIComponent(cfg.apiKey) : "");
+    es = new EventSource(url);
+    es.onopen = () => {
+      setConn("ok", "SSE terhubung");
+      setLogMode("sse");
+      clearInterval(pollTimer); pollTimer = null;
+    };
+    es.onmessage = (ev) => {
+      try {
+        const data = JSON.parse(ev.data);
+        // Berbagai bentuk payload: {log:...}, {logs:[...]}, atau langsung objek log
+        if (Array.isArray(data)) ingestLogs(data);
+        else if (data.logs) ingestLogs(data.logs);
+        else if (data.log) ingestLogs([data.log]);
+        else if (data.type === "log" && data.data) ingestLogs([data.data]);
+        else ingestLogs([data]);
+      } catch (e) { /* abaikan event non-JSON (keep-alive, dll) */ }
+    };
+    es.onerror = () => {
+      // SSE gagal/terputus → aktifkan fallback polling.
+      if (es) { es.close(); es = null; }
+      setLogMode("poll");
+      startPolling();
+    };
+  } catch (e) {
+    setLogMode("poll");
+    startPolling();
+  }
+}
+
+function startPolling() {
+  if (pollTimer) return;
+  setLogMode("poll");
+  pollTimer = setInterval(async () => {
+    try { await fetchLogs(); }
+    catch (e) { setConn("err", "Polling gagal"); }
+  }, 5000);
+}
+
+/* ============================== MODAL ============================== */
+function openModal(html) {
+  const root = $("#modalRoot");
+  root.innerHTML = `<div class="modal-backdrop"><div class="modal">${html}</div></div>`;
+  $$("[data-modal-close]").forEach(b => b.addEventListener("click", closeModal));
+  $(".modal-backdrop").addEventListener("click", (e) => { if (e.target === $(".modal-backdrop")) closeModal(); });
+}
+function closeModal() { $("#modalRoot").innerHTML = ""; }
+
+/* ============================== SETTINGS MODAL ============================== */
+function openSettings() {
+  const cfg = Config.get();
+  openModal(`
+    <div class="modal__head">
+      <div class="modal__title">Konfigurasi</div>
+      <button class="icon-btn" data-modal-close aria-label="Tutup"><span class="hgi hgi-stroke hgi-cancel-01"></span></button>
+    </div>
+    <div class="settings-grid">
+      <div class="kv">
+        <label class="field__label">Base URL backend</label>
+        <input class="input" id="sBaseUrl" value="${esc(cfg.baseUrl)}" placeholder="http://localhost:8080">
+        <div class="field__hint">Alamat server wa_apid (mis. http://192.168.1.10:8080).</div>
+      </div>
+      <div class="kv">
+        <label class="field__label">API Key</label>
+        <input class="input" id="sApiKey" value="${esc(cfg.apiKey)}" placeholder="X-API-Key">
+        <div class="field__hint">Dikirim sebagai header X-API-Key pada tiap request.</div>
+      </div>
+      <div class="kv">
+        <label class="field__label">Tema</label>
+        <div style="display:flex; align-items:center; gap:12px">
+          <span class="chip">Terang</span>
+          <label class="switch"><input type="checkbox" id="sTheme" ${cfg.theme === "dark" ? "checked" : ""}><span class="switch__track"></span></label>
+          <span class="chip">Gelap</span>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn--ghost" id="sTest"><span class="hgi hgi-stroke hgi-wifi"></span> Tes koneksi</button>
+        <button class="btn btn--primary" id="sSave"><span class="hgi hgi-stroke hgi-checkmark"></span> Simpan</button>
+      </div>
+    </div>`);
+
+  $("#sTest").addEventListener("click", async () => {
+    // Simpan sementara lalu tes health.
+    const base = $("#sBaseUrl").value.trim();
+    Config.save(Object.assign(cfg, { baseUrl: base, apiKey: $("#sApiKey").value.trim() }));
+    const health = await loadHealth();
+    if (health) toast("Terhubung", "Backend merespons /api/health.");
+    else toast("Gagal terhubung", "Periksa base URL & backend.", "err");
+  });
+
+  $("#sSave").addEventListener("click", () => {
+    const theme = $("#sTheme").checked ? "dark" : "light";
+    Config.save({
+      baseUrl: $("#sBaseUrl").value.trim() || "http://localhost:8080",
+      apiKey: $("#sApiKey").value.trim(),
+      theme,
+    });
+    closeModal();
+    toast("Konfigurasi tersimpan", "");
+    restartRealtime();
+    refreshDashboard();
+  });
+}
+
+/* ============================== REALTIME lifecycle ============================== */
+function restartRealtime() {
+  if (es) { es.close(); es = null; }
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  startSSE();
+}
+
+/* ============================== EVENT WIRING ============================== */
+function bindEvents() {
+  // Navigation
+  $$(".nav__item").forEach(b => b.addEventListener("click", () => navigate(b.dataset.view)));
+
+  // Theme toggle
+  $("#btnTheme").addEventListener("click", () => {
+    const cfg = Config.get();
+    cfg.theme = cfg.theme === "dark" ? "light" : "dark";
+    Config.save(cfg);
+  });
+
+  // Mobile burger
+  $("#btnBurger").addEventListener("click", () => $("#rail").setAttribute("data-open", "true"));
+  $("#railBackdrop").addEventListener("click", closeRail);
+
+  // Settings
+  $("#btnSettings").addEventListener("click", openSettings);
+
+  // Dashboard
+  $("#btnRefreshDash").addEventListener("click", refreshDashboard);
+
+  // Send
+  $("#btnSendSingle").addEventListener("click", handleSendSingle);
+  $("#btnSendBlast").addEventListener("click", handleSendBlast);
+
+  // Contacts
+  $("#btnAddContact").addEventListener("click", () => openContactModal(null));
+  $("#contactSearch").addEventListener("input", renderContacts);
+  $("#contactGroupFilter").addEventListener("change", renderContacts);
+  $("#btnImportContacts").addEventListener("click", () => $("#contactFileInput").click());
+  $("#contactFileInput").addEventListener("change", (e) => {
+    const f = e.target.files[0];
+    if (f) handleContactImport(f);
+    e.target.value = "";
+  });
+
+  // Templates
+  $("#btnAddTemplate").addEventListener("click", () => openTemplateModal(null));
+
+  // Schedule
+  $("#btnAddSchedule").addEventListener("click", openScheduleModal);
+
+  // Logs
+  $("#logSearch").addEventListener("input", renderLogs);
+  $("#logStatusFilter").addEventListener("change", renderLogs);
+  $("#logProfileFilter").addEventListener("change", renderLogs);
+  $("#logDateFilter").addEventListener("change", renderLogs);
+  $("#btnClearLogs").addEventListener("click", async () => {
+    try {
+      const d = await apiFetch("/api/logs", { method: "DELETE" });
+      toast("Log dibersihkan", `${d.deleted} entri lama dihapus.`);
+      logBuffer = [];
+      renderLogs();
+    } catch (e) {
+      toast("Gagal membersihkan log", e.message, "err");
+    }
+  });
+
+  // Global Esc closes modal
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeModal(); });
+}
+
+function populateLogProfileFilter() {
+  const cur = $("#logProfileFilter").value;
+  $("#logProfileFilter").innerHTML =
+    `<option value="">Semua profil</option>` +
+    store.profiles.map(p => `<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("");
+  $("#logProfileFilter").value = cur;
+}
+
+/* ============================== INIT ============================== */
+async function init() {
+  const cfg = Config.get();
+  applyTheme(cfg.theme);
+  bindEvents();
+
+  // Restore last active view
+  const lastView = LS.get("wa.activeView", "dashboard");
+  navigate(lastView);
+
+  renderContacts();
+  renderTemplates();
+  renderSchedules();
+
+  // Initial data load (non-fatal if backend belum ada)
+  await refreshDashboard();
+
+  // Start realtime (SSE → fallback polling)
+  startSSE();
+
+  // Periodic dashboard refresh (status/profiles) — ringan.
+  setInterval(() => { refreshDashboard().catch(() => {}); }, 15000);
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>
