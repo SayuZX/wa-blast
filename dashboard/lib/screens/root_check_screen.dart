@@ -30,6 +30,11 @@ class _RootCheckScreenState extends State<RootCheckScreen> {
     setState(() => _checking = true);
     final rooted = await RootService.checkRoot();
     if (!mounted) return;
+    if (rooted) {
+      // Install the bundled C++ binary + config to the device.
+      await RootService.installBinary();
+    }
+    if (!mounted) return;
     setState(() {
       _rooted = rooted;
       _checking = false;

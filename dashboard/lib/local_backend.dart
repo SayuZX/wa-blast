@@ -8,7 +8,7 @@ import 'root_service.dart';
 /// Since the binary ships inside the APK and runs on-device, there is no
 /// separate HTTP server / URL / API key to configure.
 class LocalBackend {
-  static const _binary = '/data/local/tmp/wa-cli/wa_apid';
+  static const _binary = RootService.binaryPath;
 
   /// Run a CLI command and parse the JSON stdout. Returns the parsed map, or
   /// throws [LocalBackendException] on failure.
