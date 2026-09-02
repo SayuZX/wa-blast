@@ -357,13 +357,7 @@ int main(int argc, char** argv) {
   }
 
   crow::SimpleApp app;
-
-  // --- CORS ---
-  auto& cors = app.get_middleware<crow::CORSHandler>();
-  cors.global()
-      .origin("*")
-      .methods("GET"_method, "POST"_method, "DELETE"_method)
-      .headers("X-API-Key", "Authorization", "Content-Type");
+  (void)app;  // no CORS needed — dashboard is served same-origin
 
   // --- /api/health (no auth) ---
   CROW_ROUTE(app, "/api/health")
