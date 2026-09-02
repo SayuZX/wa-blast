@@ -1,0 +1,9 @@
+PLACEHOLDER — ganti file ini dengan binary `wa_apid` hasil kompilasi C++.
+
+Cara:
+  1. cd cpp_backend && ./build_android.sh   (di Linux/macOS dengan NDK)
+  2. cp build-android/wa_apid dashboard/assets/wa_apid
+  3. flutter build apk
+
+File ini hanya placeholder agar `flutter pub get` tidak gagal (asset dideklarasikan
+di pubspec.yaml). Binary asli berukuran beberapa MB (statically-linked C++).
