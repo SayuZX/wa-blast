@@ -18,6 +18,11 @@
     "backoff_seconds": [5, 10, 20],
     "preflight_check": true,
     "fallback_clipboard": true,
-    "lock_file": "/data/local/tmp/.wa_lock"
+    "lock_file": "/data/local/tmp/.wa_lock",
+    "anti_ban": true,
+    "max_per_hour": 60,
+    "cooldown_after": 20,
+    "cooldown_seconds": 300,
+    "jitter_seconds": 3
   }
 }

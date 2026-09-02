@@ -71,6 +71,11 @@ bool load(const std::string& path, Config& out, std::string& err) {
     out.blast.preflight_check = b(bl, "preflight_check", out.blast.preflight_check);
     out.blast.lock_file = s(bl, "lock_file", out.blast.lock_file);
     out.blast.fallback_clipboard = b(bl, "fallback_clipboard", out.blast.fallback_clipboard);
+    out.blast.anti_ban = b(bl, "anti_ban", out.blast.anti_ban);
+    out.blast.max_per_hour = i(bl, "max_per_hour", out.blast.max_per_hour);
+    out.blast.cooldown_after = i(bl, "cooldown_after", out.blast.cooldown_after);
+    out.blast.cooldown_seconds = i(bl, "cooldown_seconds", out.blast.cooldown_seconds);
+    out.blast.jitter_seconds = i(bl, "jitter_seconds", out.blast.jitter_seconds);
     if (bl.contains("backoff_seconds") && bl["backoff_seconds"].is_array()) {
       out.blast.backoff_seconds.clear();
       for (const auto& v : bl["backoff_seconds"])

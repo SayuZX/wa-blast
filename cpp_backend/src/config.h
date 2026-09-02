@@ -21,6 +21,13 @@ struct BlastConfig {
   bool preflight_check = true;
   std::string lock_file = "/data/local/tmp/.wa_lock";
   bool fallback_clipboard = true;
+
+  // --- Anti-ban / rate-limit ---
+  bool anti_ban = true;           // master switch
+  int max_per_hour = 60;          // hard cap messages/hour (0 = unlimited)
+  int cooldown_after = 20;        // insert a long cooldown every N messages
+  int cooldown_seconds = 300;     // length of that cooldown (default 5 min)
+  int jitter_seconds = 3;         // random +/- jitter added to each delay
 };
 
 struct Config {
