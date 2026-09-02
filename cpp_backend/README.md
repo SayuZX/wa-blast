@@ -4,6 +4,51 @@
 > rooted device in a controlled lab. Not for production, spam, or ToS
 > violation. Use at your own risk.
 
+## Apa kegunaan backend & API ini?
+
+Backend ini adalah **mesin otomasi QA untuk aplikasi WhatsApp di perangkat
+Android yang di-root**. Tujuannya: mensimulasikan beban percakapan antar
+banyak akun (1–100 profil) dan menguji stabilitas, manajemen sesi multi-akun,
+serta interoperabilitas antar profil secara **terisolasi** di lingkungan
+development.
+
+Secara konkret, backend ini menyediakan:
+
+1. **CLI (`wa-cli`)** — perintah terminal untuk:
+   - `switch <profile>` → pindah profil (restore data + terapkan props spoof).
+   - `send <phone> <message>` → kirim satu pesan.
+   - `blast <file.txt>` → kirim pesan ke banyak nomor sekaligus.
+   - `status` → lihat profil aktif + props.
+   - `server start` → jalankan HTTP API.
+
+2. **HTTP API (port 8080)** — supaya skrip/CI/dashboard bisa mengirim perintah
+   pengujian dari luar perangkat (mis. dari PC via ADB forward, atau dari app
+   lain). Endpoint: `/api/send`, `/api/blast`, `/api/status`, `/api/logs`, dll.
+
+3. **Kegunaan API (kenapa butuh HTTP):**
+   - **Automasi QA** — test framework (curl/Python/dashboard) memicu skenario
+     percakapan tanpa interaksi manual.
+   - **Integrasi CI** — pipeline bisa `POST /api/blast` untuk smoke test.
+   - **Observability** — `/api/logs` memberi detail tiap percobaan kirim
+     (status, attempt, error_code, durasi) untuk debugging "send failed".
+
+4. **Mengapa binary C++ tunggal:** tidak butuh Python/Node/JVM di perangkat.
+   Satu file statis yang bisa dijalankan via Termux atau `adb shell`.
+
+## Arsitektur
+
+```
+Dashboard Flutter ──▶ (platform channel Kotlin: cek root + su) ──▶ wa_apid
+                                                                   │
+   HTTP API (8080) ◀── curl / CI / skrip  ──────────────────────────┘
+   │  ADB (popen): switch profil, input text, keyevent, intent
+   │  Titanium-style: snapshot/restore /data/data/com.whatsapp
+   │  Props spoof: resetprop + android_id (LSPosed untuk IMEI)
+   │  SQLite: profiles, commands, logs
+```
+
+---
+
 A **single static C++ binary** (C++20, CrowCpp, SQLite) that:
 
 - Runs an HTTP API on port 8080 (configurable).
