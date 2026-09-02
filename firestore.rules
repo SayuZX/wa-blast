@@ -1,0 +1,215 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuth() && request.auth.uid == userId;
+    }
+
+    function getUserRoleData(userId) {
+      return exists(/databases/$(database)/documents/users/$(userId))
+        && 'role' in get(/databases/$(database)/documents/users/$(userId)).data
+        && get(/databases/$(database)/documents/users/$(userId)).data.role is string
+        ? get(/databases/$(database)/documents/users/$(userId)).data.role.lower()
+        : 'guest';
+    }
+
+    function isFounder(userId) {
+      let role = getUserRoleData(userId);
+      return role == 'founder';
+    }
+
+    function isAdmin(userId) {
+      let role = getUserRoleData(userId);
+      return role in ['administrator', 'developer', 'owner', 'founder'];
+    }
+
+    function isModerator(userId) {
+      let role = getUserRoleData(userId);
+      return role in ['moderator', 'administrator', 'developer', 'owner', 'founder'];
+    }
+
+    function hasRole(userId, requiredRole) {
+      return requiredRole == 'founder' ? isFounder(userId) :
+             requiredRole == 'administrator' ? isAdmin(userId) :
+             requiredRole == 'moderator' ? isModerator(userId) : false;
+    }
+
+    function noAdminFieldsModified() {
+      return !request.resource.data.diff(resource.data)
+              .affectedKeys()
+              .hasAny(['edition', 'role', 'badges', 'permissions']);
+    }
+
+    // =====================================================================
+    //  QA MULTI-PROFILE HARNESS  (backend Cloud Functions / dashboard)
+    //  Collection baru ditambahkan ke rules yang sudah ada, memakai fungsi
+    //  auth + role yang sama (isAuth / hasRole / isOwner / isModerator).
+    //  Backend admin (Cloud Functions) berjalan dengan service account,
+    //  sehingga bypass rules ini — akses client-side harus role admin.
+    // =====================================================================
+
+    // ---- Profiles: daftar profil WA_1..WA_N --------------------------
+    // Baca: semua user terautentikasi (dashboard baca langsung).
+    // Tulis: hanya admin client-side; backend tulis via service account
+    //        (bypass rules) — ini proteksi tambahan untuk akses langsung.
+    match /profiles/{profileId} {
+      allow read: if isAuth();
+      allow create, update, delete: if isAuth() && hasRole(request.auth.uid, 'administrator');
+    }
+
+    // ---- Messages: riwayat pengiriman pesan per profil ---------------
+    // Baca: semua user terautentikasi.
+    // Tulis: admin (client-side); backend bypass via service account.
+    match /messages/{messageId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && hasRole(request.auth.uid, 'administrator');
+      allow update, delete: if isAuth() && hasRole(request.auth.uid, 'administrator');
+    }
+
+    // ---- Logs: log aktivitas terstruktur ------------------------------
+    // Baca: semua user terautentikasi.
+    // Tulis: hanya backend (service account, bypass); client-side admin.
+    match /logs/{logId} {
+      allow read: if isAuth();
+      allow create: if isAuth() && hasRole(request.auth.uid, 'administrator');
+      allow update, delete: if false;
+    }
+
+    // ---- Config: konfigurasi global harness ---------------------------
+    // Sensitif (API key, ADB IP, dll.) — tetap ketat: admin saja.
+    match /config/{configId} {
+      allow read: if isAuth() && hasRole(request.auth.uid, 'administrator');
+      allow write: if isAuth() && hasRole(request.auth.uid, 'administrator');
+    }
+
+    // =====================================================================
+    //  RULES EXISTING (APLIKASI ANIME) — TIDAK DIUBAH
+    // =====================================================================
+
+    match /users/{userId} {
+      allow read: if true;
+      allow create: if isAuth();
+      allow update: if isAuth()
+                    && !request.resource.data.diff(resource.data)
+                        .affectedKeys()
+                        .hasAny(['uid', 'role', 'edition', 'badges', 'permissions', 'email', 'createdAt', 'provider']);
+      allow delete: if false;
+
+      match /bookmarks/{animeId} {
+        allow read, write: if true;
+      }
+
+      match /history/{animeId} {
+        allow read, write: if true;
+      }
+    }
+
+    match /social_users/{userId} {
+      allow read, write: if true;
+    }
+
+    match /anime_social/{animeId} {
+      allow read: if true;
+      allow write: if true;
+
+      match /votes/{userId} {
+        allow read, write: if true;
+      }
+
+      match /comments/{commentId} {
+        allow read, create, update, delete: if true;
+
+        match /replies/{replyId} {
+          allow read, create, update, delete: if true;
+        }
+      }
+    }
+
+    match /anime/{topicId} {
+      allow read: if true;
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create: if isAuth();
+        allow update, delete: if isAuth() && (request.auth.uid == resource.data.uid || hasRole(request.auth.uid, 'moderator'));
+
+        match /likes/{userId} {
+          allow read: if true;
+          allow write: if isOwner(userId);
+        }
+      }
+    }
+
+    match /requests/{requestId} {
+      allow read: if true;
+      allow create: if isAuth();
+      allow update, delete: if isAuth();
+
+      match /votes/{userId} {
+        allow read: if true;
+        allow write: if isAuth();
+      }
+
+      match /comments/{commentId} {
+        allow read: if true;
+        allow create, update, delete: if isAuth();
+      }
+    }
+
+    function isChatParticipant(chatId) {
+      return isAuth()
+        && exists(/databases/$(database)/documents/chats/$(chatId))
+        && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
+    }
+
+    match /chats/{chatId} {
+      allow read: if isAuth() && request.auth.uid in resource.data.participants;
+
+      allow create: if isAuth()
+                    && request.auth.uid in request.resource.data.participants
+                    && request.resource.data.participants.size() == 2;
+
+      allow update: if isAuth()
+                    && request.auth.uid in resource.data.participants
+                    && request.resource.data.participants == resource.data.participants;
+
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isChatParticipant(chatId);
+        allow create: if isChatParticipant(chatId)
+                      && request.resource.data.senderId == request.auth.uid;
+        allow update: if isChatParticipant(chatId)
+                      && request.resource.data.senderId == resource.data.senderId;
+
+        allow delete: if false;
+      }
+    }
+
+    match /roles/{roleId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && hasRole(request.auth.uid, 'administrator');
+    }
+
+    match /effects/{effectId} {
+      allow read: if isAuth();
+      allow write: if isAuth() && hasRole(request.auth.uid, 'administrator');
+    }
+
+    match /anime_requests/{requestId} {
+      allow read: if isAuth();
+      allow create: if isAuth();
+      allow update, delete: if isAuth() && (request.auth.uid == resource.data.requesterId || hasRole(request.auth.uid, 'moderator'));
+    }
+
+    match /reports/{reportId} {
+      allow create: if isAuth();
+      allow read, update, delete: if isAuth() && hasRole(request.auth.uid, 'moderator');
+    }
+  }
+}
