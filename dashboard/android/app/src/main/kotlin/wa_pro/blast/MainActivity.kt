@@ -5,15 +5,16 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import java.io.BufferedReader
+import java.io.File
 import java.io.InputStreamReader
 
 /**
  * MainActivity — exposes a platform channel (`wa_pro.blast/root`) to Dart for:
  *   - checkRoot()   : is the device rooted / can we elevate via `su`?
- *   - execAsRoot(cmd): run a shell command via `su -c`, return stdout/stderr/exit.
+ *   - execAsRoot(cmd): run a shell command (via `su` if available, else `/system/bin/sh`).
  *
- * Used by the dashboard's "root check" gate screen and to run the bundled
- * `wa_apid` native binary on the device.
+ * If the device is NOT rooted, commands run WITHOUT elevation (simulation
+ * mode) instead of throwing "Cannot run program su".
  */
 class MainActivity : FlutterActivity() {
 
@@ -30,7 +31,7 @@ class MainActivity : FlutterActivity() {
                     "checkRoot" -> result.success(checkRoot())
                     "execAsRoot" -> {
                         val cmd = call.argument<String>("cmd") ?: ""
-                        execAsRoot(cmd) { code, out, err ->
+                        execShell(cmd) { code, out, err ->
                             result.success(
                                 mapOf(
                                     "exitCode" to code,
@@ -45,8 +46,16 @@ class MainActivity : FlutterActivity() {
             }
     }
 
+    private fun suAvailable(): Boolean {
+        for (p in listOf("/system/bin/su", "/system/xbin/su", "/sbin/su", "/su/bin/su")) {
+            if (File(p).exists()) return true
+        }
+        return false
+    }
+
     private fun checkRoot(): Boolean {
         return try {
+            if (!suAvailable()) return false
             val p = Runtime.getRuntime().exec(arrayOf("su", "-c", "id"))
             val code = p.waitFor()
             code == 0
@@ -55,10 +64,18 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    private fun execAsRoot(cmd: String, cb: (Int, String, String) -> Unit) {
+    /**
+     * Run a command. Uses `su -c` if rooted, else `/system/bin/sh -c` (no root).
+     * Never throws to the caller — errors are returned via exitCode/stderr.
+     */
+    private fun execShell(cmd: String, cb: (Int, String, String) -> Unit) {
         Thread {
             try {
-                val p = Runtime.getRuntime().exec(arrayOf("su", "-c", cmd))
+                val argv = if (suAvailable())
+                    arrayOf("su", "-c", cmd)
+                else
+                    arrayOf("/system/bin/sh", "-c", cmd)
+                val p = Runtime.getRuntime().exec(argv)
                 val out = BufferedReader(InputStreamReader(p.inputStream)).readText()
                 val err = BufferedReader(InputStreamReader(p.errorStream)).readText()
                 val code = p.waitFor()
