@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 
 import '../state.dart';
 
-/// Manual trigger form + CSV/TXT batch upload.
+/// Manual trigger form + CSV/TXT batch upload, with anti-ban toggle.
 class SendScreen extends StatefulWidget {
   const SendScreen({super.key});
 
@@ -17,6 +17,7 @@ class _SendScreenState extends State<SendScreen> {
   final _numberController = TextEditingController();
   final _messageController = TextEditingController();
   bool _sending = false;
+  bool _antiBan = true;
 
   @override
   void dispose() {
@@ -41,17 +42,13 @@ class _SendScreenState extends State<SendScreen> {
   }
 
   Future<void> _pickAndUpload() async {
-    // Grab state before any await (avoids use_build_context_synchronously).
     final state = context.read<HarnessState>();
-    // file_picker 12.x API: static `FilePicker.pickFiles(...)` returning
-    // a List<PlatformFile> (no `.platform`, no `FilePickerResult`).
     final files = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['csv', 'txt'],
     );
     if (files.isEmpty) return;
     final file = files.single;
-    // file_picker 12.x: read content via `readAsBytes()` (async), not `bytes`.
     final bytes = await file.readAsBytes();
     if (bytes.isEmpty) {
       _toast('Could not read file');
@@ -77,55 +74,109 @@ class _SendScreenState extends State<SendScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        Text('Manual trigger', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _numberController,
-          keyboardType: TextInputType.phone,
-          decoration: const InputDecoration(
-            labelText: 'Destination number',
-            hintText: 'e.g. +62 812 3456 7890',
-            prefixIcon: HugeIcon(icon: HugeIcons.strokeRoundedCall),
+        // --- Manual trigger ---
+        Text('Manual trigger', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                TextField(
+                  controller: _numberController,
+                  keyboardType: TextInputType.phone,
+                  decoration: const InputDecoration(
+                    labelText: 'Destination number',
+                    hintText: '+62 812 3456 7890',
+                    prefixIcon: HugeIcon(icon: HugeIcons.strokeRoundedCall),
+                    helperText: 'Include country code, e.g. +62',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _messageController,
+                  maxLines: 4,
+                  maxLength: 2000,
+                  decoration: const InputDecoration(
+                    labelText: 'Message',
+                    hintText: 'Message body',
+                    prefixIcon: HugeIcon(icon: HugeIcons.strokeRoundedChatting01),
+                    alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _sending ? null : _sendManual,
+                    icon: _sending
+                        ? const _SpinningIcon(icon: HugeIcons.strokeRoundedRefresh, size: 18)
+                        : const HugeIcon(icon: HugeIcons.strokeRoundedSent, size: 18),
+                    label: Text(_sending ? 'Sending…' : 'Send message'),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 16),
-        TextField(
-          controller: _messageController,
-          maxLines: 4,
-          decoration: const InputDecoration(
-            labelText: 'Message',
-            hintText: 'Message body',
-            prefixIcon: HugeIcon(icon: HugeIcons.strokeRoundedChatting01),
-            alignLabelWithHint: true,
+
+        const SizedBox(height: 24),
+
+        // --- Anti-ban protection ---
+        Text('Anti-ban protection', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 12),
+        Card(
+          child: Column(
+            children: [
+              SwitchListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                secondary: const HugeIcon(icon: HugeIcons.strokeRoundedAlertCircle),
+                title: const Text('Avoid number blocking'),
+                subtitle: const Text(
+                  'Rate limit, jitter, and cooldown to reduce ban risk',
+                ),
+                value: _antiBan,
+                onChanged: (v) => setState(() => _antiBan = v),
+              ),
+              const Divider(height: 1),
+              const ListTile(
+                leading: HugeIcon(icon: HugeIcons.strokeRoundedQueue01),
+                title: Text('Max 60 messages / hour'),
+                subtitle: Text('Cooldown 5 min every 20 messages'),
+                dense: true,
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 16),
-        ElevatedButton.icon(
-          onPressed: _sending ? null : _sendManual,
-          icon: _sending
-              ? const _SpinningIcon(icon: HugeIcons.strokeRoundedRefresh, size: 18)
-              : const HugeIcon(icon: HugeIcons.strokeRoundedSent, size: 18),
-          label: Text(_sending ? 'Sending…' : 'Send message'),
-        ),
-        const SizedBox(height: 32),
-        const Divider(),
-        const SizedBox(height: 32),
-        Text('Batch trigger (CSV/TXT)',
-            style: Theme.of(context).textTheme.titleLarge),
+
+        const SizedBox(height: 24),
+
+        // --- Batch trigger ---
+        Text('Batch trigger (CSV/TXT)', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600)),
         const SizedBox(height: 8),
         Text(
           'CSV: "number,message" per line. TXT: "number<TAB>message". '
-          'Runs sequentially with a 5–10 s jitter between messages.',
-          style: Theme.of(context).textTheme.bodySmall,
+          'Runs sequentially with jittered delay between messages.',
+          style: theme.textTheme.bodySmall,
         ),
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
-          onPressed: _sending ? null : _pickAndUpload,
-          icon: const HugeIcon(icon: HugeIcons.strokeRoundedQueue01),
-          label: const Text('Upload file & run batch'),
+        const SizedBox(height: 12),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: _sending ? null : _pickAndUpload,
+                icon: const HugeIcon(icon: HugeIcons.strokeRoundedUpload01),
+                label: const Text('Upload file & run batch'),
+              ),
+            ),
+          ),
         ),
       ],
     );
