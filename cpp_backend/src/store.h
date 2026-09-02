@@ -30,4 +30,10 @@ nlohmann::json list_logs(const std::string& profile,
 nlohmann::json get_log(const std::string& id);
 int delete_old_logs(int retention_days);
 
+// --- raw SQL access (for contacts/templates/scheduler modules) ---
+// Execute a single statement (no result). Returns false + err on failure.
+bool exec_sql(const std::string& sql, std::string& err);
+// Run a SELECT and return rows as JSON array of objects (columns keyed by name).
+nlohmann::json query(const std::string& sql);
+
 }  // namespace store

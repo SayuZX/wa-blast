@@ -77,6 +77,35 @@ bool open(const std::string& path, std::string& err) {
     );
     CREATE INDEX IF NOT EXISTS idx_logs_status ON logs(status);
     CREATE INDEX IF NOT EXISTS idx_logs_profile ON logs(profile);
+    CREATE TABLE IF NOT EXISTS contacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT,
+      phone TEXT,
+      grp TEXT,
+      custom_fields TEXT,
+      created_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT,
+      body TEXT,
+      created_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS schedules (
+      id TEXT PRIMARY KEY,
+      name TEXT,
+      type TEXT,
+      target TEXT,
+      message TEXT,
+      template_id INTEGER,
+      variables TEXT,
+      profile TEXT,
+      run_at TEXT,
+      recurring TEXT,
+      status TEXT,
+      last_run TEXT,
+      created_at TEXT
+    );
   )SQL";
   return exec(schema, err);
 }
@@ -266,6 +295,49 @@ int delete_old_logs(int retention_days) {
   if (emsg) sqlite3_free(emsg);
   int deleted = sqlite3_changes(g_db);
   return (rc == SQLITE_OK) ? deleted : -1;
+}
+
+// ---------------------------------------------------------------------------
+// Raw SQL access (shared by contacts/templates/scheduler modules)
+// ---------------------------------------------------------------------------
+bool exec_sql(const std::string& sql, std::string& err) {
+  std::lock_guard<std::mutex> lk(g_mu);
+  char* emsg = nullptr;
+  int rc = sqlite3_exec(g_db, sql.c_str(), nullptr, nullptr, &emsg);
+  if (rc != SQLITE_OK) {
+    err = emsg ? emsg : "sqlite error";
+    if (emsg) sqlite3_free(emsg);
+    return false;
+  }
+  return true;
+}
+
+nlohmann::json query(const std::string& sql) {
+  std::lock_guard<std::mutex> lk(g_mu);
+  nlohmann::json arr = nlohmann::json::array();
+  sqlite3_stmt* st = nullptr;
+  if (sqlite3_prepare_v2(g_db, sql.c_str(), -1, &st, nullptr) != SQLITE_OK) return arr;
+  int ncol = sqlite3_column_count(st);
+  while (sqlite3_step(st) == SQLITE_ROW) {
+    nlohmann::json o = nlohmann::json::object();
+    for (int c = 0; c < ncol; c++) {
+      const char* name = sqlite3_column_name(st, c);
+      int type = sqlite3_column_type(st, c);
+      if (type == SQLITE_INTEGER) {
+        o[name] = sqlite3_column_int64(st, c);
+      } else if (type == SQLITE_FLOAT) {
+        o[name] = sqlite3_column_double(st, c);
+      } else if (type == SQLITE_NULL) {
+        o[name] = nullptr;
+      } else {
+        const char* txt = (const char*)sqlite3_column_text(st, c);
+        o[name] = txt ? std::string(txt) : std::string("");
+      }
+    }
+    arr.push_back(o);
+  }
+  sqlite3_finalize(st);
+  return arr;
 }
 
 }  // namespace store
