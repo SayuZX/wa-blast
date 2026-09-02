@@ -16,15 +16,10 @@ dependencies:
   # Material 3 (built into Flutter) — no extra package needed.
   # Hugeicons — exclusive icon library for this dashboard.
   hugeicons: ^1.1.7
-  # Networking + state.
-  http: ^1.2.1
+  # State management.
   provider: ^6.1.2
   # CSV/TXT file picking for batch upload.
   file_picker: ^12.1.3
-  # Local persistence for API key + server URL.
-  shared_preferences: ^2.2.3
-  # Intl for timestamps.
-  intl: ^0.19.0
 
 dev_dependencies:
   flutter_test:
@@ -33,3 +28,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Bundled native binary (C++ wa_apid) + config, extracted to device at runtime.
+  assets:
+    - assets/wa_apid
+    - assets/config.json
