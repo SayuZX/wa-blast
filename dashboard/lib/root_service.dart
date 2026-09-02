@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -6,6 +7,11 @@ import 'package:flutter/services.dart';
 /// running shell commands via `su -c`.
 class RootService {
   static const _channel = MethodChannel('wa_pro.blast/root');
+
+  /// Device path where the binary + config are installed.
+  static const workDir = '/data/local/tmp/wa-cli';
+  static const binaryPath = '$workDir/wa_apid';
+  static const configPath = '$workDir/config.json';
 
   /// True if the device is rooted and `su` is available.
   static Future<bool> checkRoot() async {
@@ -40,27 +46,47 @@ class RootService {
     }
   }
 
-  /// Install the bundled `wa_apid` binary to /data/local/tmp and chmod +x.
-  /// Returns the device path on success, or null on failure.
+  /// Install the bundled `wa_apid` binary + config from Flutter assets to
+  /// /data/local/tmp/wa-cli and chmod +x. Returns the binary path on success.
+  ///
+  /// The asset bytes are base64-encoded and piped through `su -c` to write
+  /// the file on-device (assets can't be written directly without root).
   static Future<String?> installBinary() async {
-    const workDir = '/data/local/tmp/wa-cli';
     final mkdir = await execAsRoot('mkdir -p $workDir');
     if ((mkdir['exitCode'] as int? ?? -1) != 0) return null;
-    // The binary is bundled as a Flutter asset; we can't write it directly
-    // from Dart to /data/local/tmp without root, so we base64-stream it.
-    // For simplicity, the deploy step pushes the binary via adb. This method
-    // is a placeholder that verifies the directory exists.
-    final test = await execAsRoot('test -x $workDir/wa_apid && echo ok');
+
+    // Extract binary asset -> base64 -> su write.
+    try {
+      final binData = await rootBundle.load('assets/wa_apid');
+      final b64 = base64Encode(binData.buffer.asUint8List());
+      final writeBin = await execAsRoot(
+        "echo $b64 | base64 -d > $binaryPath && chmod +x $binaryPath",
+      );
+      if ((writeBin['exitCode'] as int? ?? -1) != 0) return null;
+    } catch (_) {
+      // Binary asset missing (not yet built) — tolerate for dev.
+    }
+
+    // Extract config asset.
+    try {
+      final cfgData = await rootBundle.load('assets/config.json');
+      final cfgB64 = base64Encode(cfgData.buffer.asUint8List());
+      await execAsRoot("echo $cfgB64 | base64 -d > $configPath");
+    } catch (_) {
+      // config optional.
+    }
+
+    // Verify binary is executable.
+    final test = await execAsRoot('test -x $binaryPath && echo ok');
     if ((test['stdout'] as String? ?? '').contains('ok')) {
-      return '$workDir/wa_apid';
+      return binaryPath;
     }
     return null;
   }
 
   /// Run a wa-cli command (e.g. "status", "server start").
   static Future<Map<String, dynamic>> runCli(String args) async {
-    const binary = '/data/local/tmp/wa-cli/wa_apid';
-    return execAsRoot('$binary $args');
+    return execAsRoot('$binaryPath $args');
   }
 
   // Fallback for non-rooted platforms: adb via local process (host dev).
